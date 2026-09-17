@@ -1,0 +1,15 @@
+{
+  "name": "vishwaneed-marketplace",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/customer-web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @vishwaneed/customer-web",
+    "build": "npm run build --workspace @vishwaneed/customer-web",
+    "typecheck": "npm run typecheck --workspace @vishwaneed/customer-web",
+    "lint": "npm run lint --workspace @vishwaneed/customer-web",
+    "test": "npm run test --workspace @vishwaneed/customer-web"
+  }
+}
