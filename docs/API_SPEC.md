@@ -1,0 +1,393 @@
+# VISHWANEED — API SPECIFICATION
+
+## 1. API PRINCIPLES
+
+Base API:
+
+/api/v1
+
+All APIs must:
+
+- Validate input
+- Authenticate where required
+- Authorize by role
+- Return consistent responses
+- Support pagination where appropriate
+- Return correct HTTP status codes
+- Never expose sensitive information
+
+---
+
+# 2. AUTH
+
+POST /api/v1/auth/register
+
+POST /api/v1/auth/login
+
+POST /api/v1/auth/verify-otp
+
+POST /api/v1/auth/refresh
+
+POST /api/v1/auth/logout
+
+POST /api/v1/auth/forgot-password
+
+POST /api/v1/auth/reset-password
+
+---
+
+# 3. CUSTOMER
+
+GET /api/v1/customers/me
+
+PATCH /api/v1/customers/me
+
+GET /api/v1/customers/me/addresses
+
+POST /api/v1/customers/me/addresses
+
+PATCH /api/v1/customers/me/addresses/:id
+
+DELETE /api/v1/customers/me/addresses/:id
+
+---
+
+# 4. CATEGORIES
+
+GET /api/v1/categories
+
+GET /api/v1/categories/:id
+
+---
+
+# 5. PRODUCTS
+
+GET /api/v1/products
+
+GET /api/v1/products/:id
+
+GET /api/v1/products/:id/reviews
+
+Query parameters may include:
+
+search
+category
+productType
+minPrice
+maxPrice
+sort
+page
+limit
+
+---
+
+# 6. VENDOR PRODUCTS
+
+GET /api/v1/vendor/products
+
+POST /api/v1/vendor/products
+
+GET /api/v1/vendor/products/:id
+
+PATCH /api/v1/vendor/products/:id
+
+DELETE /api/v1/vendor/products/:id
+
+POST /api/v1/vendor/products/:id/submit
+
+---
+
+# 7. VENDOR KYC
+
+GET /api/v1/vendor/kyc
+
+POST /api/v1/vendor/kyc/documents
+
+PATCH /api/v1/vendor/kyc
+
+GET /api/v1/vendor/kyc/status
+
+---
+
+# 8. VENDOR ORDERS
+
+GET /api/v1/vendor/orders
+
+GET /api/v1/vendor/orders/:id
+
+PATCH /api/v1/vendor/orders/:id/status
+
+POST /api/v1/vendor/orders/:id/cancel-item
+
+---
+
+# 9. CART
+
+GET /api/v1/cart
+
+POST /api/v1/cart/items
+
+PATCH /api/v1/cart/items/:id
+
+DELETE /api/v1/cart/items/:id
+
+DELETE /api/v1/cart
+
+---
+
+# 10. CHECKOUT
+
+POST /api/v1/checkout/validate
+
+POST /api/v1/orders
+
+GET /api/v1/orders/:id
+
+GET /api/v1/orders
+
+---
+
+# 11. PAYMENT
+
+POST /api/v1/payments/create
+
+POST /api/v1/payments/verify
+
+POST /api/v1/payments/webhook
+
+POST /api/v1/payments/:id/refund
+
+---
+
+# 12. SHIPPING
+
+POST /api/v1/shipments
+
+GET /api/v1/shipments/:id
+
+GET /api/v1/orders/:id/shipments
+
+GET /api/v1/shipments/:id/tracking
+
+POST /api/v1/shipments/webhook
+
+---
+
+# 13. RETURNS
+
+POST /api/v1/orders/:orderId/items/:itemId/return
+
+GET /api/v1/returns
+
+GET /api/v1/returns/:id
+
+---
+
+# 14. REPLACEMENT
+
+POST /api/v1/orders/:orderId/items/:itemId/replacement
+
+GET /api/v1/replacements
+
+GET /api/v1/replacements/:id
+
+---
+
+# 15. REVIEWS
+
+POST /api/v1/products/:productId/reviews
+
+GET /api/v1/products/:productId/reviews
+
+PATCH /api/v1/reviews/:id
+
+DELETE /api/v1/reviews/:id
+
+---
+
+# 16. COMPLAINTS
+
+POST /api/v1/complaints
+
+GET /api/v1/complaints
+
+GET /api/v1/complaints/:id
+
+POST /api/v1/complaints/:id/messages
+
+---
+
+# 17. ADMIN VENDORS
+
+GET /api/v1/admin/vendors
+
+GET /api/v1/admin/vendors/:id
+
+PATCH /api/v1/admin/vendors/:id/status
+
+POST /api/v1/admin/vendors/:id/approve
+
+POST /api/v1/admin/vendors/:id/reject
+
+POST /api/v1/admin/vendors/:id/suspend
+
+---
+
+# 18. ADMIN KYC
+
+GET /api/v1/admin/vendor-kyc
+
+GET /api/v1/admin/vendor-kyc/:id
+
+POST /api/v1/admin/vendor-kyc/:id/approve
+
+POST /api/v1/admin/vendor-kyc/:id/reject
+
+---
+
+# 19. ADMIN INSPECTIONS
+
+POST /api/v1/admin/vendors/:vendorId/inspection
+
+GET /api/v1/admin/vendors/:vendorId/inspections
+
+PATCH /api/v1/admin/inspections/:id
+
+---
+
+# 20. ADMIN PRODUCTS
+
+GET /api/v1/admin/products
+
+GET /api/v1/admin/products/:id
+
+POST /api/v1/admin/products/:id/approve
+
+POST /api/v1/admin/products/:id/reject
+
+---
+
+# 21. ADMIN ORDERS
+
+GET /api/v1/admin/orders
+
+GET /api/v1/admin/orders/:id
+
+---
+
+# 22. ADMIN PAYMENTS
+
+GET /api/v1/admin/payments
+
+GET /api/v1/admin/payments/:id
+
+---
+
+# 23. COMMISSION
+
+GET /api/v1/vendor/commission
+
+GET /api/v1/vendor/commission/transactions
+
+GET /api/v1/admin/commission/rules
+
+POST /api/v1/admin/commission/rules
+
+PATCH /api/v1/admin/commission/rules/:id
+
+---
+
+# 24. LEDGER
+
+GET /api/v1/vendor/ledger
+
+GET /api/v1/vendor/ledger/transactions
+
+GET /api/v1/admin/vendors/:vendorId/ledger
+
+---
+
+# 25. SETTLEMENTS
+
+GET /api/v1/vendor/settlements
+
+GET /api/v1/vendor/settlements/:id
+
+GET /api/v1/admin/settlements
+
+GET /api/v1/admin/settlements/:id
+
+POST /api/v1/admin/settlements/:id/process
+
+---
+
+# 26. REFUNDS
+
+GET /api/v1/admin/refunds
+
+GET /api/v1/admin/refunds/:id
+
+POST /api/v1/admin/refunds/:id/process
+
+---
+
+# 27. NOTIFICATIONS
+
+POST /api/v1/notifications/whatsapp
+
+GET /api/v1/notifications
+
+---
+
+# 28. STANDARD SUCCESS RESPONSE
+
+{
+  "success": true,
+  "data": {},
+  "message": "Operation successful",
+  "meta": {}
+}
+
+---
+
+# 29. STANDARD ERROR RESPONSE
+
+{
+  "success": false,
+  "data": null,
+  "message": "Human readable error",
+  "error": {
+    "code": "ERROR_CODE",
+    "details": {}
+  }
+}
+
+---
+
+# 30. PAGINATION RESPONSE
+
+{
+  "success": true,
+  "data": [],
+  "message": "Success",
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 100,
+    "totalPages": 5
+  }
+}
+
+---
+
+# 31. FRONTEND/BACKEND CONTRACT
+
+Developer 1 must consume APIs through a typed API client.
+
+Developer 1 must NOT directly access the database.
+
+Developer 1 must NOT duplicate backend business logic.
+
+Developer 2 must document any API contract changes.
+
+Breaking API changes require coordination between both developers.
