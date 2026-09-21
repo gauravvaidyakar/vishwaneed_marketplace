@@ -4,6 +4,32 @@
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "cd ../.. && npm run build --workspace @vishwaneed/customer-web",
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/Admin", "destination": "/admin", "permanent": true },
+    {
+      "source": "/Admin/:path*",
+      "destination": "/admin/:path*",
+      "permanent": true
+    },
+    { "source": "/Vendor", "destination": "/vendor", "permanent": true },
+    {
+      "source": "/Vendor/:path*",
+      "destination": "/vendor/:path*",
+      "permanent": true
+    },
+    { "source": "/Vender", "destination": "/vendor", "permanent": true },
+    {
+      "source": "/Vender/:path*",
+      "destination": "/vendor/:path*",
+      "permanent": true
+    },
+    { "source": "/vender", "destination": "/vendor", "permanent": true },
+    {
+      "source": "/vender/:path*",
+      "destination": "/vendor/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/admin",
