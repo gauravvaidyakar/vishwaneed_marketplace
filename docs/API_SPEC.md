@@ -107,6 +107,8 @@ PATCH /api/v1/vendor/kyc
 
 GET /api/v1/vendor/kyc/status
 
+PATCH /api/v1/vendor/contact
+
 ---
 
 # 8. VENDOR ORDERS
@@ -349,7 +351,25 @@ GET /api/v1/notifications
 
 ---
 
-# 28. STANDARD SUCCESS RESPONSE
+# 28. INTEGRATION SETTINGS
+
+Admin integration configuration (ADMIN role only):
+
+GET /api/v1/admin/integration-settings
+
+PATCH /api/v1/admin/integration-settings
+
+DELETE /api/v1/admin/integration-settings/:key
+
+The GET response contains only configured/source state and masked hints. It never
+returns plaintext or encrypted credential values. PATCH accepts only the approved
+Razorpay, Shiprocket and Interakt keys. Stored values are encrypted at rest and
+all changes are recorded in AuditLog without credential contents. Environment
+variables remain fallback values when no database override exists.
+
+---
+
+# 29. STANDARD SUCCESS RESPONSE
 
 {
   "success": true,
@@ -360,7 +380,7 @@ GET /api/v1/notifications
 
 ---
 
-# 29. STANDARD ERROR RESPONSE
+# 30. STANDARD ERROR RESPONSE
 
 {
   "success": false,
@@ -374,7 +394,7 @@ GET /api/v1/notifications
 
 ---
 
-# 30. PAGINATION RESPONSE
+# 31. PAGINATION RESPONSE
 
 {
   "success": true,
@@ -390,7 +410,7 @@ GET /api/v1/notifications
 
 ---
 
-# 31. FRONTEND/BACKEND CONTRACT
+# 32. FRONTEND/BACKEND CONTRACT
 
 Developer 1 must consume APIs through a typed API client.
 

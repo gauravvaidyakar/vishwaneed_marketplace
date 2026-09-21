@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsEmail,
   IsNotEmpty,
   IsObject,
   IsOptional,
@@ -24,6 +25,11 @@ export class UpdateVendorDto {
   @IsOptional() @IsString() fssaiNumber?: string;
   @IsOptional() @IsString() @Matches(/^\d{6}$/) pickupPincode?: string;
   @IsOptional() @IsObject() businessAddress?: Record<string, string>;
+}
+
+export class UpdateVendorContactDto {
+  @IsOptional() @IsEmail() businessEmail?: string;
+  @IsString() @Matches(/^(?:\+91)?[6-9]\d{9}$/) businessMobile!: string;
 }
 
 export class BankAccountDto {

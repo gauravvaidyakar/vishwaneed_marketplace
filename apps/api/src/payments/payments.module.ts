@@ -5,7 +5,9 @@ import {
   PaymentWebhooksController,
 } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
+import { NotificationsModule } from "../notifications/notifications.module";
 @Module({
+  imports: [NotificationsModule],
   controllers: [PaymentsController, PaymentWebhooksController],
   providers: [PaymentsService, RazorpayPaymentProvider],
   exports: [PaymentsService, RazorpayPaymentProvider],

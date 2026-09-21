@@ -6,7 +6,11 @@ import { CurrentUser } from "../common/current-user.decorator";
 import type { RequestUser } from "../common/request-user";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
-import { BankAccountDto, UpdateVendorDto } from "./vendors.dto";
+import {
+  BankAccountDto,
+  UpdateVendorContactDto,
+  UpdateVendorDto,
+} from "./vendors.dto";
 import { VendorsService } from "./vendors.service";
 
 @ApiTags("Vendor profile")
@@ -27,6 +31,12 @@ export class VendorsController {
     @Body() input: UpdateVendorDto,
   ) {
     return this.vendors.update(user.id, input);
+  }
+  @Patch("contact") updateContact(
+    @CurrentUser() user: RequestUser,
+    @Body() input: UpdateVendorContactDto,
+  ) {
+    return this.vendors.updateContact(user.id, input);
   }
   @Post("bank-account") bank(
     @CurrentUser() user: RequestUser,

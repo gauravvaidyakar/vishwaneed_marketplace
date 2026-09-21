@@ -4,7 +4,6 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import {
   OrderStatus,
   PaymentStatus,
@@ -13,6 +12,8 @@ import {
 } from "@prisma/client";
 import { createHash } from "node:crypto";
 import { PrismaService } from "../database/prisma.service";
+import { IntegrationSettingsService } from "../integration-settings/integration-settings.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import {
   finalizeMasterOrder,
   releaseOrderItemInventory,
@@ -31,7 +32,8 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly provider: RazorpayPaymentProvider,
-    private readonly config: ConfigService,
+    private readonly notifications: NotificationsService,
+    private readonly integrationSettings: IntegrationSettingsService,
   ) {}
 
   async create(userId: string, masterOrderId: string) {
@@ -112,7 +114,7 @@ export class PaymentsService {
     if (payment.providerOrderId !== input.providerOrderId) {
       throw new BadRequestException("Provider order does not match payment");
     }
-    const secret = this.config.get<string>("RAZORPAY_KEY_SECRET");
+    const secret = await this.integrationSettings.get("RAZORPAY_KEY_SECRET");
     if (
       !secret ||
       !verifyRazorpaySignature(
@@ -158,7 +160,7 @@ export class PaymentsService {
   }
 
   async webhook(rawBody: Buffer, signature: string | undefined) {
-    const secret = this.config.get<string>("RAZORPAY_WEBHOOK_SECRET");
+    const secret = await this.integrationSettings.get("RAZORPAY_WEBHOOK_SECRET");
     if (
       !secret ||
       !signature ||
@@ -218,7 +220,7 @@ export class PaymentsService {
   }
 
   private async confirmPayment(paymentId: string, providerPaymentId: string) {
-    return this.prisma.$transaction(
+    const updated = await this.prisma.$transaction(
       async (tx) => {
         const payment = await tx.payment.findUniqueOrThrow({
           where: { id: paymentId },
@@ -250,6 +252,10 @@ export class PaymentsService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    await this.notifications
+      .notifyPaymentStatus(updated.masterOrderId, "PAID")
+      .catch(() => undefined);
+    return updated;
   }
 
   private async handlePaymentCaptured(payload: WebhookEntity) {
@@ -321,6 +327,9 @@ export class PaymentsService {
         },
       });
     });
+    await this.notifications
+      .notifyPaymentStatus(payment.masterOrderId, "FAILED")
+      .catch(() => undefined);
   }
 
   private async handleRefundProcessed(payload: WebhookEntity) {
@@ -406,7 +415,7 @@ export class PaymentsService {
     return value;
   }
 
-  private session(
+  private async session(
     paymentId: string,
     masterOrderId: string,
     providerOrderId: string,
@@ -418,7 +427,7 @@ export class PaymentsService {
       masterOrderId,
       provider: "RAZORPAY",
       providerOrderId,
-      publicKey: this.config.get<string>("RAZORPAY_KEY_ID"),
+      publicKey: await this.integrationSettings.get("RAZORPAY_KEY_ID"),
       amountMinor: Math.round(amount * 100),
       currency: "INR",
       customer: { name: "" },

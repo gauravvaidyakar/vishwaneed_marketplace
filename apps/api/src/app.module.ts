@@ -14,6 +14,7 @@ import { validateEnvironment } from "./config/environment";
 import { CustomersModule } from "./customers/customers.module";
 import { DatabaseModule } from "./database/database.module";
 import { InventoryModule } from "./inventory/inventory.module";
+import { IntegrationSettingsModule } from "./integration-settings/integration-settings.module";
 import { LedgerModule } from "./ledger/ledger.module";
 import { NotificationsModule } from "./notifications/notifications.module";
 import { OrdersModule } from "./orders/orders.module";
@@ -35,6 +36,7 @@ import { VendorsModule } from "./vendors/vendors.module";
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     DatabaseModule,
+    IntegrationSettingsModule,
     AuthModule,
     UsersModule,
     CustomersModule,

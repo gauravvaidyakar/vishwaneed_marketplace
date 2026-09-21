@@ -1494,7 +1494,15 @@ const resourceConfig = {
   notifications: [
     "Notification events",
     "/admin/notifications",
-    ["channel", "templateKey", "status", "sentAt", "createdAt"],
+    [
+      "channel",
+      "templateKey",
+      "status",
+      "providerReference",
+      "failureReason",
+      "sentAt",
+      "createdAt",
+    ],
   ],
   audit: [
     "Audit logs",
@@ -2019,30 +2027,141 @@ function Reports() {
   );
 }
 function System() {
+  const client = useQueryClient();
+  const [values, setValues] = useState<Record<string, string>>({});
+  const q = useQuery({
+    queryKey: ["integration-settings"],
+    queryFn: () => api.get<IntegrationSetting[]>("/admin/integration-settings"),
+  });
+  const save = useMutation({
+    mutationFn: (body: Record<string, string>) =>
+      api.patch<IntegrationSetting[]>("/admin/integration-settings", body),
+    onSuccess: (data) => {
+      client.setQueryData(["integration-settings"], data);
+      setValues({});
+    },
+  });
+  const remove = useMutation({
+    mutationFn: (key: string) =>
+      api.delete<IntegrationSetting[]>(
+        `/admin/integration-settings/${encodeURIComponent(key)}`,
+      ),
+    onSuccess: (data) => client.setQueryData(["integration-settings"], data),
+  });
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const changed = Object.fromEntries(
+      Object.entries(values).filter(([, value]) => value.trim()),
+    );
+    if (Object.keys(changed).length) save.mutate(changed);
+  };
   return (
     <>
       <Head
         title="System configuration"
-        subtitle="Operational policies remain environment-backed until dedicated configuration APIs are provided."
+        subtitle="Securely configure external services without editing server environment files."
       />
-      <div className="grid">
-        <section className="card">
-          <h2>Backend authority</h2>
-          <p>
-            Settlement days, return window, shipping, tax and notification
-            provider settings are not editable from the browser.
-          </p>
-        </section>
-        <section className="card">
-          <h2>Security</h2>
-          <p>
-            No bank secrets, JWT secrets, Razorpay secrets or Interakt
-            credentials are exposed to this application.
-          </p>
-        </section>
-      </div>
+      <Async query={q}>
+        {q.data && (
+          <form className="integration-settings" onSubmit={submit} autoComplete="off">
+            <section className="security-note">
+              <ShieldCheck />
+              <div>
+                <strong>Encrypted credential storage</strong>
+                <p>
+                  Existing values are never sent back to the browser. Enter only
+                  values you want to add or replace; blank fields remain unchanged.
+                </p>
+              </div>
+            </section>
+            {(["RAZORPAY", "SHIPROCKET", "INTERAKT"] as const).map(
+              (provider) => {
+                const settings = q.data.filter(
+                  (setting) => setting.provider === provider,
+                );
+                const ready = settings.length > 0 && settings.every((setting) => setting.configured);
+                return (
+                  <section className="card integration-card" key={provider}>
+                    <div className="integration-heading">
+                      <div>
+                        <small>EXTERNAL INTEGRATION</small>
+                        <h2>{provider[0] + provider.slice(1).toLowerCase()}</h2>
+                      </div>
+                      <Status value={ready ? "CONFIGURED" : "INCOMPLETE"} />
+                    </div>
+                    <div className="credential-grid">
+                      {settings.map((setting) => (
+                        <label key={setting.key}>
+                          <span>{setting.label}</span>
+                          <input
+                            type={setting.secret ? "password" : setting.key.endsWith("EMAIL") ? "email" : "text"}
+                            value={values[setting.key] ?? ""}
+                            placeholder={setting.configured ? setting.maskedValue ?? "Configured" : "Not configured"}
+                            autoComplete="new-password"
+                            onChange={(event) =>
+                              setValues((current) => ({
+                                ...current,
+                                [setting.key]: event.target.value,
+                              }))
+                            }
+                          />
+                          <small>
+                            {setting.configured
+                              ? `Stored via ${setting.source.toLowerCase()}`
+                              : "Required"}
+                            {setting.updatedAt
+                              ? ` · Updated ${new Date(setting.updatedAt).toLocaleString("en-IN")}`
+                              : ""}
+                          </small>
+                          {setting.source === "DATABASE" && (
+                            <button
+                              type="button"
+                              className="danger-link"
+                              disabled={remove.isPending}
+                              onClick={() => {
+                                if (window.confirm(`Remove the stored ${setting.label}?`)) {
+                                  remove.mutate(setting.key);
+                                }
+                              }}
+                            >
+                              Remove stored value
+                            </button>
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </section>
+                );
+              },
+            )}
+            {(save.error || remove.error) && (
+              <p className="form-error">{(save.error ?? remove.error)?.message}</p>
+            )}
+            <div className="configuration-actions">
+              <span>Changes take effect for new provider requests immediately.</span>
+              <button
+                className="primary"
+                disabled={save.isPending || !Object.values(values).some((value) => value.trim())}
+              >
+                {save.isPending ? "Saving securely…" : "Save configuration"}
+              </button>
+            </div>
+          </form>
+        )}
+      </Async>
     </>
   );
+}
+
+interface IntegrationSetting {
+  key: string;
+  provider: "RAZORPAY" | "SHIPROCKET" | "INTERAKT";
+  label: string;
+  secret: boolean;
+  configured: boolean;
+  source: "DATABASE" | "ENVIRONMENT" | "NONE";
+  maskedValue: string | null;
+  updatedAt: string | null;
 }
 function Table({
   columns,

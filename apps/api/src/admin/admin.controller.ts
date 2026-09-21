@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -17,6 +18,8 @@ import type { RequestUser } from "../common/request-user";
 import { Roles } from "../common/roles.decorator";
 import { RolesGuard } from "../common/roles.guard";
 import { PaginationDto } from "../common/pagination.dto";
+import { IntegrationSettingsService } from "../integration-settings/integration-settings.service";
+import { UpdateIntegrationSettingsDto } from "../integration-settings/integration-settings.dto";
 import { RejectProductDto } from "../products/products.dto";
 import { VendorDocumentsService } from "../vendor-documents/vendor-documents.service";
 import { VendorInspectionsService } from "../vendor-inspections/vendor-inspections.service";
@@ -38,6 +41,7 @@ export class AdminController {
     private readonly admin: AdminService,
     private readonly documents: VendorDocumentsService,
     private readonly inspections: VendorInspectionsService,
+    private readonly integrationSettings: IntegrationSettingsService,
   ) {}
   @Get("dashboard") dashboard() {
     return this.admin.dashboard();
@@ -138,4 +142,19 @@ export class AdminController {
   @Get("notifications") notifications(@Query() query: PaginationDto) { return this.admin.notifications(query.page, query.limit); }
   @Get("audit-logs") auditLogs(@Query() query: PaginationDto) { return this.admin.auditLogs(query.page, query.limit); }
   @Get("reports") reports() { return this.admin.reports(); }
+  @Get("integration-settings") integrationConfiguration() {
+    return this.integrationSettings.list();
+  }
+  @Patch("integration-settings") updateIntegrationConfiguration(
+    @CurrentUser() user: RequestUser,
+    @Body() input: UpdateIntegrationSettingsDto,
+  ) {
+    return this.integrationSettings.update(user.id, input);
+  }
+  @Delete("integration-settings/:key") removeIntegrationConfiguration(
+    @CurrentUser() user: RequestUser,
+    @Param("key") key: string,
+  ) {
+    return this.integrationSettings.remove(user.id, key);
+  }
 }

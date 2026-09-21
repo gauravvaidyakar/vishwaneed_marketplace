@@ -1,5 +1,10 @@
-import { Injectable, ServiceUnavailableException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { IntegrationSettingsService } from "../integration-settings/integration-settings.service";
 
 export interface WhatsAppProvider {
   send(
@@ -18,14 +23,17 @@ export class DevelopmentWhatsAppProvider implements WhatsAppProvider {
 }
 
 export class InteraktWhatsAppProvider implements WhatsAppProvider {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly settings: IntegrationSettingsService,
+  ) {}
 
   async send(
     templateKey: string,
     recipient: string,
     payload: Record<string, unknown>,
   ): Promise<string> {
-    const apiKey = this.config.get<string>("INTERAKT_API_KEY");
+    const apiKey = await this.settings.get("INTERAKT_API_KEY");
     const url = this.config.get<string>("INTERAKT_API_URL");
     if (!apiKey || !url) {
       throw new ServiceUnavailableException("Interakt is not configured");
@@ -62,22 +70,28 @@ export class InteraktWhatsAppProvider implements WhatsAppProvider {
 
 @Injectable()
 export class WhatsAppProviderRouter implements WhatsAppProvider {
-  private readonly provider: WhatsAppProvider;
+  private readonly development = new DevelopmentWhatsAppProvider();
+  private readonly interakt: WhatsAppProvider;
+  private readonly logger = new Logger(WhatsAppProviderRouter.name);
 
-  constructor(config: ConfigService) {
-    const configured = config.get<string>("WHATSAPP_PROVIDER");
-    const production = config.get<string>("NODE_ENV") === "production";
-    this.provider =
-      configured === "INTERAKT" || (production && configured !== "DEVELOPMENT")
-        ? new InteraktWhatsAppProvider(config)
-        : new DevelopmentWhatsAppProvider();
+  constructor(
+    config: ConfigService,
+    private readonly settings: IntegrationSettingsService,
+  ) {
+    this.interakt = new InteraktWhatsAppProvider(config, settings);
+    this.logger.warn(
+      "WhatsApp uses the development simulator until an Interakt API key is configured",
+    );
   }
 
-  send(
+  async send(
     templateKey: string,
     recipient: string,
     payload: Record<string, unknown>,
   ) {
-    return this.provider.send(templateKey, recipient, payload);
+    const provider = (await this.settings.has("INTERAKT_API_KEY"))
+      ? this.interakt
+      : this.development;
+    return provider.send(templateKey, recipient, payload);
   }
 }

@@ -1,6 +1,6 @@
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { IntegrationSettingsService } from "../integration-settings/integration-settings.service";
 
 export interface ProviderPaymentOrder {
   id: string;
@@ -52,7 +52,7 @@ export function verifyRazorpaySignature(
 
 @Injectable()
 export class RazorpayPaymentProvider implements PaymentProvider {
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly settings: IntegrationSettingsService) {}
 
   async createOrder(input: {
     amountMinor: number;
@@ -113,8 +113,10 @@ export class RazorpayPaymentProvider implements PaymentProvider {
     path: string,
     init: RequestInit,
   ): Promise<Record<string, unknown>> {
-    const key = this.config.get<string>("RAZORPAY_KEY_ID");
-    const secret = this.config.get<string>("RAZORPAY_KEY_SECRET");
+    const [key, secret] = await Promise.all([
+      this.settings.get("RAZORPAY_KEY_ID"),
+      this.settings.get("RAZORPAY_KEY_SECRET"),
+    ]);
     if (!key || !secret) {
       throw new ServiceUnavailableException(
         "Razorpay credentials are not configured",

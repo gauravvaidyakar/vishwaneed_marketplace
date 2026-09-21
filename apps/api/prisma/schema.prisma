@@ -222,24 +222,25 @@ enum NotificationStatus {
 }
 
 model User {
-  id                  String             @id @default(uuid()) @db.Uuid
-  email               String?            @unique
-  mobile              String?            @unique
-  passwordHash        String
-  role                Role
-  status              UserStatus         @default(ACTIVE)
-  refreshTokenHash    String?
-  emailVerifiedAt     DateTime?
-  mobileVerifiedAt    DateTime?
-  lastLoginAt         DateTime?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  customerProfile     CustomerProfile?
-  vendor              Vendor?
-  inspectionsAssigned VendorInspection[] @relation("InspectionInspector")
-  documentsVerified   VendorDocument[]   @relation("DocumentVerifier")
-  auditLogs           AuditLog[]         @relation("AuditActor")
-  passwordResetTokens PasswordResetToken[]
+  id                         String               @id @default(uuid()) @db.Uuid
+  email                      String?              @unique
+  mobile                     String?              @unique
+  passwordHash               String
+  role                       Role
+  status                     UserStatus           @default(ACTIVE)
+  refreshTokenHash           String?
+  emailVerifiedAt            DateTime?
+  mobileVerifiedAt           DateTime?
+  lastLoginAt                DateTime?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  customerProfile            CustomerProfile?
+  vendor                     Vendor?
+  inspectionsAssigned        VendorInspection[]   @relation("InspectionInspector")
+  documentsVerified          VendorDocument[]     @relation("DocumentVerifier")
+  auditLogs                  AuditLog[]           @relation("AuditActor")
+  integrationSettingsUpdated IntegrationSetting[] @relation("IntegrationSettingUpdater")
+  passwordResetTokens        PasswordResetToken[]
 
   @@index([role, status])
 }
@@ -890,6 +891,7 @@ model ComplaintMessage {
 model Notification {
   id                String             @id @default(uuid()) @db.Uuid
   userId            String             @db.Uuid
+  dedupeKey         String?            @unique
   channel           String
   templateKey       String
   payload           Json
@@ -917,6 +919,18 @@ model AuditLog {
 
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
+}
+
+model IntegrationSetting {
+  key            String   @id
+  encryptedValue String
+  valueHint      String
+  updatedById    String?  @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  updatedBy      User?    @relation("IntegrationSettingUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([updatedById, updatedAt])
 }
 
 model ProviderEvent {

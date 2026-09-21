@@ -9,6 +9,8 @@ import { OrderStatus, Prisma, Role, ShipmentStatus } from "@prisma/client";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { RequestUser } from "../common/request-user";
 import { PrismaService } from "../database/prisma.service";
+import { IntegrationSettingsService } from "../integration-settings/integration-settings.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import {
   DevelopmentShippingProvider,
   type ShipmentCreateInput,
@@ -20,29 +22,30 @@ import {
 
 @Injectable()
 export class ShippingService {
-  private readonly provider: ShippingProvider;
-  constructor(config: ConfigService) {
-    const selected = config
-      .get<string>(
-        "SHIPPING_PROVIDER",
-        config.get<string>("NODE_ENV") === "production"
-          ? "SHIPROCKET"
-          : "DEVELOPMENT",
-      )
-      .toUpperCase();
-    this.provider =
-      selected === "DEVELOPMENT"
-        ? new DevelopmentShippingProvider(config)
-        : new ShiprocketShippingProvider(config);
+  private readonly development: ShippingProvider;
+  private readonly shiprocket: ShippingProvider;
+  constructor(
+    config: ConfigService,
+    private readonly settings: IntegrationSettingsService,
+  ) {
+    this.development = new DevelopmentShippingProvider(config);
+    this.shiprocket = new ShiprocketShippingProvider(settings);
   }
-  quote(input: ShippingRateInput): Promise<ShippingRate> {
-    return this.provider.quote(input);
+  private async provider(): Promise<ShippingProvider> {
+    const [email, password] = await Promise.all([
+      this.settings.has("SHIPROCKET_EMAIL"),
+      this.settings.has("SHIPROCKET_PASSWORD"),
+    ]);
+    return email && password ? this.shiprocket : this.development;
   }
-  createShipment(input: ShipmentCreateInput) {
-    return this.provider.createShipment(input);
+  async quote(input: ShippingRateInput): Promise<ShippingRate> {
+    return (await this.provider()).quote(input);
   }
-  createReturnShipment(input: ShipmentCreateInput) {
-    return this.provider.createReturnShipment(input);
+  async createShipment(input: ShipmentCreateInput) {
+    return (await this.provider()).createShipment(input);
+  }
+  async createReturnShipment(input: ShipmentCreateInput) {
+    return (await this.provider()).createReturnShipment(input);
   }
 }
 
@@ -52,6 +55,8 @@ export class ShipmentsService {
     private readonly prisma: PrismaService,
     private readonly shipping: ShippingService,
     private readonly config: ConfigService,
+    private readonly notifications: NotificationsService,
+    private readonly integrationSettings: IntegrationSettingsService,
   ) {}
   async tracking(user: RequestUser, id: string) {
     const shipment = await this.prisma.shipment.findUnique({
@@ -125,7 +130,7 @@ export class ShipmentsService {
       })),
     };
     const result = await this.shipping.createShipment(input);
-    return this.prisma.shipment.create({
+    const shipment = await this.prisma.shipment.create({
       data: {
         vendorOrderId: order.id,
         provider: result.provider,
@@ -143,10 +148,17 @@ export class ShipmentsService {
         ],
       },
     });
+    await this.notifications
+      .notifyShipmentStatus(order.id, shipment.status, {
+        awb: shipment.awb,
+        trackingUrl: shipment.trackingUrl,
+      })
+      .catch(() => undefined);
+    return shipment;
   }
 
   async shiprocketWebhook(rawBody: Buffer, suppliedSecret?: string) {
-    const expectedSecret = this.config.get<string>("SHIPROCKET_WEBHOOK_SECRET");
+    const expectedSecret = await this.integrationSettings.get("SHIPROCKET_WEBHOOK_SECRET");
     if (
       !expectedSecret ||
       !suppliedSecret ||
@@ -264,6 +276,12 @@ export class ShipmentsService {
           data: { processedAt: now, failureReason: null },
         });
       });
+      await this.notifications
+        .notifyShipmentStatus(shipment.vendorOrderId, status, {
+          awb: awb || shipment.awb,
+          trackingUrl: shipment.trackingUrl,
+        })
+        .catch(() => undefined);
       return { accepted: true, duplicate: false };
     } catch (error) {
       await this.prisma.providerEvent.update({

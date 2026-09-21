@@ -15,7 +15,11 @@ import {
 } from "@prisma/client";
 import { FieldEncryptionService } from "../common/field-encryption.service";
 import { PrismaService } from "../database/prisma.service";
-import type { BankAccountDto, UpdateVendorDto } from "./vendors.dto";
+import type {
+  BankAccountDto,
+  UpdateVendorContactDto,
+  UpdateVendorDto,
+} from "./vendors.dto";
 
 const REQUIRED_DOCUMENTS: VendorDocumentType[] = [
   VendorDocumentType.PAN,
@@ -127,6 +131,17 @@ export class VendorsService {
     return this.prisma.vendor.update({
       where: { id: vendor.id },
       data: { ...input, businessAddress: input.businessAddress },
+    });
+  }
+
+  async updateContact(userId: string, input: UpdateVendorContactDto) {
+    const vendor = await this.getByUser(userId);
+    return this.prisma.vendor.update({
+      where: { id: vendor.id },
+      data: {
+        businessEmail: input.businessEmail?.toLowerCase(),
+        businessMobile: input.businessMobile,
+      },
     });
   }
 

@@ -17,6 +17,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { randomUUID } from "node:crypto";
 import { PrismaService } from "../database/prisma.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { VendorsService } from "../vendors/vendors.service";
 import type { CreateReturnDto } from "./returns.dto";
 
@@ -32,6 +33,7 @@ export class ReturnsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly vendors: VendorsService,
+    private readonly notifications: NotificationsService,
   ) {}
   async create(
     userId: string,
@@ -76,6 +78,9 @@ export class ReturnsService {
       });
       return request;
     });
+    await this.notifications
+      .notifyReturnStatus(request.id, request.status)
+      .catch(() => undefined);
     return this.presentReturn(request);
   }
 
@@ -171,7 +176,7 @@ export class ReturnsService {
         `Return cannot move from ${request.status} to ${status}`,
       );
     }
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       if (status === ReturnStatus.REJECTED) {
         await tx.orderItem.update({
           where: { id: request.orderItemId },
@@ -250,6 +255,10 @@ export class ReturnsService {
         },
       });
     });
+    await this.notifications
+      .notifyReturnStatus(updated.id, updated.status)
+      .catch(() => undefined);
+    return updated;
   }
 
   private presentReturn(request: {

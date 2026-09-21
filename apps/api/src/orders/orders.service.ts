@@ -324,10 +324,7 @@ export class OrdersService {
         timeout: 15_000,
       },
     );
-    await this.notifications.sendWhatsApp(userId, "order_placed", {
-      orderNumber: order.orderNumber,
-      payableTotal: order.payableTotal.toString(),
-    });
+    await this.notifications.notifyOrderPlaced(order.id).catch(() => undefined);
     return this.presentCustomerOrder(order);
   }
 
@@ -407,7 +404,7 @@ export class OrdersService {
             this.config.get<number>("SETTLEMENT_DAYS", 7) * 86_400_000,
         )
       : undefined;
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.vendorOrder.update({
         where: { id },
         data: { status, deliveredAt, settlementEligibleAt },
@@ -434,6 +431,10 @@ export class OrdersService {
       }
       return updated;
     });
+    await this.notifications
+      .notifyVendorOrderStatus(id, status)
+      .catch(() => undefined);
+    return updated;
   }
   async cancelItem(
     userId: string,
@@ -452,7 +453,11 @@ export class OrdersService {
       },
     });
     if (!item) throw new NotFoundException("Order item not found");
-    return this.cancelOwnedItem(item, reason);
+    const updated = await this.cancelOwnedItem(item, reason);
+    await this.notifications
+      .notifyItemCancelled(item.id, "VENDOR")
+      .catch(() => undefined);
+    return updated;
   }
 
   async customerCancelItem(
@@ -475,6 +480,9 @@ export class OrdersService {
     });
     if (!item) throw new NotFoundException("Order item not found");
     await this.cancelOwnedItem(item, reason);
+    await this.notifications
+      .notifyItemCancelled(item.id, "CUSTOMER")
+      .catch(() => undefined);
     return this.customerGet(userId, orderId);
   }
 

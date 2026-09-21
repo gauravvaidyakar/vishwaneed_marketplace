@@ -18,30 +18,16 @@ export function validateEnvironment(input: Environment): Environment {
   ) {
     throw new Error("JWT secrets must each contain at least 32 characters");
   }
-  if (!/^[a-fA-F0-9]{64}$/.test(input.BANK_DATA_ENCRYPTION_KEY ?? ""))
+  const encryptionKey = input.BANK_DATA_ENCRYPTION_KEY ?? "";
+  const encryptionKeyBytes = /^[a-fA-F0-9]{64}$/.test(encryptionKey)
+    ? Buffer.from(encryptionKey, "hex")
+    : Buffer.from(encryptionKey, "base64");
+  if (encryptionKeyBytes.length !== 32)
     throw new Error(
-      "BANK_DATA_ENCRYPTION_KEY must be 64 hexadecimal characters",
+      "BANK_DATA_ENCRYPTION_KEY must be 64 hexadecimal characters or a Base64-encoded 32-byte key",
     );
   if (environment === "production" && input.CORS_ORIGINS?.includes("*")) {
     throw new Error("Wildcard CORS is prohibited in production");
-  }
-  if (environment === "production") {
-    const productionRequired = [
-      "RAZORPAY_KEY_ID",
-      "RAZORPAY_KEY_SECRET",
-      "RAZORPAY_WEBHOOK_SECRET",
-      "SHIPROCKET_EMAIL",
-      "SHIPROCKET_PASSWORD",
-      "SHIPROCKET_WEBHOOK_SECRET",
-      "INTERAKT_API_KEY",
-      "INTERAKT_API_URL",
-    ];
-    const missingProduction = productionRequired.filter((key) => !input[key]);
-    if (missingProduction.length > 0) {
-      throw new Error(
-        `Missing production integrations: ${missingProduction.join(", ")}`,
-      );
-    }
   }
   return {
     ...input,

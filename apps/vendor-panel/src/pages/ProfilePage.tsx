@@ -33,6 +33,10 @@ interface BankFormValue {
   bankName: string;
   branchName: string;
 }
+interface ContactFormValue {
+  businessEmail: string;
+  businessMobile: string;
+}
 
 export function ProfilePage() {
   const client = useQueryClient();
@@ -160,6 +164,7 @@ export function ProfilePage() {
                 </div>
               </form>
             </section>
+            <ContactForm profile={profile} />
             <section className="card">
               <div className="section-title">
                 <div>
@@ -265,6 +270,71 @@ export function ProfilePage() {
         )}
       </AsyncState>
     </>
+  );
+}
+
+function ContactForm({ profile }: { profile: VendorProfile }) {
+  const client = useQueryClient();
+  const [notice, setNotice] = useState("");
+  const form = useForm<ContactFormValue>({
+    values: {
+      businessEmail: profile.businessEmail ?? "",
+      businessMobile: profile.businessMobile ?? "",
+    },
+  });
+  const save = useMutation({
+    mutationFn: (value: ContactFormValue) =>
+      api.patch("/vendor/contact", value),
+    onSuccess: () => {
+      setNotice("WhatsApp contact saved.");
+      void client.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+  return (
+    <section className="card">
+      <div className="section-title">
+        <div>
+          <small>ORDER NOTIFICATIONS</small>
+          <h2>WhatsApp contact</h2>
+        </div>
+      </div>
+      <p className="muted">
+        Order, payment, cancellation, return and shipment updates use this
+        mobile number.
+      </p>
+      <form
+        className="form-grid"
+        onSubmit={(event) =>
+          void form.handleSubmit((value) => save.mutate(value))(event)
+        }
+      >
+        <Field label="Business email">
+          <input type="email" autoComplete="email" {...form.register("businessEmail")} />
+        </Field>
+        <Field label="WhatsApp mobile">
+          <input
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="10-digit Indian mobile number"
+            {...form.register("businessMobile", {
+              required: true,
+              pattern: /^[6-9]\d{9}$/,
+            })}
+          />
+        </Field>
+        <div className="form-actions">
+          {notice && <span className="success">{notice}</span>}
+          {save.isError && (
+            <span className="form-error">
+              {save.error instanceof Error ? save.error.message : "Contact could not be saved"}
+            </span>
+          )}
+          <button className="primary" disabled={save.isPending}>
+            {save.isPending ? "Saving…" : "Save notification contact"}
+          </button>
+        </div>
+      </form>
+    </section>
   );
 }
 

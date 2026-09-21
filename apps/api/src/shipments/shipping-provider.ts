@@ -1,5 +1,7 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { createHash } from "node:crypto";
+import { IntegrationSettingsService } from "../integration-settings/integration-settings.service";
 
 export interface ShippingRateInput {
   originPincode: string;
@@ -95,15 +97,21 @@ export class DevelopmentShippingProvider implements ShippingProvider {
 
 export class ShiprocketShippingProvider implements ShippingProvider {
   private token?: string;
-  constructor(private readonly config: ConfigService) {}
+  private credentialFingerprint?: string;
+  constructor(private readonly settings: IntegrationSettingsService) {}
   private async authToken(): Promise<string> {
-    if (this.token) return this.token;
-    const email = this.config.get<string>("SHIPROCKET_EMAIL");
-    const password = this.config.get<string>("SHIPROCKET_PASSWORD");
+    const [email, password] = await Promise.all([
+      this.settings.get("SHIPROCKET_EMAIL"),
+      this.settings.get("SHIPROCKET_PASSWORD"),
+    ]);
     if (!email || !password)
       throw new ServiceUnavailableException(
         "Shiprocket credentials are not configured",
       );
+    const fingerprint = createHash("sha256")
+      .update(`${email}\0${password}`)
+      .digest("hex");
+    if (this.token && this.credentialFingerprint === fingerprint) return this.token;
     const response = await fetch(
       "https://apiv2.shiprocket.in/v1/external/auth/login",
       {
@@ -116,6 +124,7 @@ export class ShiprocketShippingProvider implements ShippingProvider {
     if (!response.ok || !body || typeof body !== "object" || !("token" in body))
       throw new ServiceUnavailableException("Shiprocket authentication failed");
     this.token = String(body.token);
+    this.credentialFingerprint = fingerprint;
     return this.token;
   }
   async quote(input: ShippingRateInput): Promise<ShippingRate> {

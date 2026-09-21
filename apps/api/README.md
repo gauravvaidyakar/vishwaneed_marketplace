@@ -21,7 +21,15 @@ The API is served at `http://localhost:4000/api/v1`. Swagger is served at `http:
 4. Each vendor creates and tracks its own shipment. Signed Shiprocket webhooks update shipment/vendor-order state independently.
 5. Delivery starts the configured return and settlement clocks. Settlement refresh creates one settlement per eligible vendor order.
 
-Development shipping and WhatsApp providers are explicitly identified in stored records. Production configuration refuses to start without real Razorpay, Shiprocket, and Interakt credentials and webhook secrets.
+Development shipping and WhatsApp providers are explicitly identified in stored records. Production requires database, JWT, encryption, and CORS configuration at startup. Razorpay, Shiprocket, and Interakt credentials can be stored after deployment through the administrator System configuration page; environment variables remain a fallback.
+
+For real WhatsApp delivery, set `WHATSAPP_PROVIDER=INTERAKT`, provide
+`INTERAKT_API_KEY`, keep `INTERAKT_API_URL` pointed at Interakt's send-template
+endpoint, and map every `WHATSAPP_TEMPLATE_*` value in `.env.example` to an
+approved/synchronised Interakt template. Vendors must save a WhatsApp mobile
+number under **Profile, KYC & inspection → WhatsApp contact**. Development mode
+only creates simulated `DEV-WHATSAPP-*` provider references and does not deliver
+messages to a handset.
 
 KYC files are private. `PRIVATE_UPLOAD_DIR` must point to durable, non-public storage and must not be served as static files. In production, replace local disk with a private S3/R2 adapter while retaining authorization checks.
 
