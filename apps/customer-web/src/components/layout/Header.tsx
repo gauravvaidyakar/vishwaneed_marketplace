@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Menu, Search, ShoppingBag, UserRound, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthProvider';
@@ -10,7 +10,7 @@ export function Header() {
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
   const { session, logout } = useAuth();
-  const cart = useCart();
+  const cart = useCart(Boolean(session));
   const categories = useCategories();
 
   const submitSearch = (event: React.FormEvent) => {
@@ -43,11 +43,12 @@ export function Header() {
             {session ? (
               <div className="account-menu">
                 <NavLink to="/account" onClick={() => setMenuOpen(false)}><UserRound size={19} /> <span>{session.customer.name.split(' ')[0]}</span></NavLink>
+                <NavLink to="/notifications" aria-label="Notifications" onClick={() => setMenuOpen(false)}><Bell size={18} /></NavLink>
                 <button type="button" aria-label="Log out" onClick={() => void logout()}><LogOut size={17} /></button>
               </div>
             ) : <NavLink to="/login" onClick={() => setMenuOpen(false)}><UserRound size={19} /> Account</NavLink>}
             <NavLink className="cart-action" to="/cart" onClick={() => setMenuOpen(false)}>
-              <ShoppingBag size={20} /> Cart <span>{cart.data?.itemCount ?? 0}</span>
+              <ShoppingBag size={20} /> Cart <span>{session ? (cart.data?.itemCount ?? 0) : 0}</span>
             </NavLink>
           </nav>
         </div>

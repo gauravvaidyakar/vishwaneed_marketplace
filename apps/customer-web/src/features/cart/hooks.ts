@@ -3,8 +3,8 @@ import { marketplaceApi } from '../../api';
 
 export const cartKey = ['customer-cart'] as const;
 
-export function useCart() {
-  return useQuery({ queryKey: cartKey, queryFn: () => marketplaceApi.getCart() });
+export function useCart(enabled = true) {
+  return useQuery({ queryKey: cartKey, queryFn: () => marketplaceApi.getCart(), enabled });
 }
 
 export function useAddToCart() {
@@ -29,4 +29,9 @@ export function useRemoveCartItem() {
     mutationFn: (itemId: string) => marketplaceApi.removeCartItem(itemId),
     onSuccess: (cart) => queryClient.setQueryData(cartKey, cart),
   });
+}
+
+export function useRefreshCart() {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: () => marketplaceApi.refreshCart(), onSuccess: (cart) => queryClient.setQueryData(cartKey, cart) });
 }

@@ -6,6 +6,8 @@ export const catalogueKeys = {
   categories: ['categories'] as const,
   products: (query: ProductQuery) => ['products', query] as const,
   product: (idOrSlug: string) => ['product', idOrSlug] as const,
+  reviews: (productId: string) => ['product-reviews', productId] as const,
+  related: (categoryId: string) => ['related-products', categoryId] as const,
 };
 
 export function useCategories() {
@@ -18,4 +20,20 @@ export function useProducts(query: ProductQuery) {
 
 export function useProduct(idOrSlug: string) {
   return useQuery({ queryKey: catalogueKeys.product(idOrSlug), queryFn: () => marketplaceApi.getProduct(idOrSlug), enabled: Boolean(idOrSlug) });
+}
+
+export function useProductReviews(productId: string) {
+  return useQuery({
+    queryKey: catalogueKeys.reviews(productId),
+    queryFn: () => marketplaceApi.getProductReviews(productId),
+    enabled: Boolean(productId),
+  });
+}
+
+export function useRelatedProducts(categoryId: string) {
+  return useQuery({
+    queryKey: catalogueKeys.related(categoryId),
+    queryFn: () => marketplaceApi.getProducts({ category: categoryId, page: 1, limit: 5 }),
+    enabled: Boolean(categoryId),
+  });
 }

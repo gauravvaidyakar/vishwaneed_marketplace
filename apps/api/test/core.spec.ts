@@ -1,0 +1,342 @@
+import { BadRequestException, NotFoundException } from "@nestjs/common";
+import type { ConfigService } from "@nestjs/config";
+import type { JwtService } from "@nestjs/jwt";
+import {
+  InspectionStatus,
+  ProductStatus,
+  Role,
+  VendorStatus,
+  VendorSuspensionReason,
+} from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+import { AdminService } from "../src/admin/admin.service";
+import { AuthService } from "../src/auth/auth.service";
+import { validateEnvironment } from "../src/config/environment";
+import type { PrismaService } from "../src/database/prisma.service";
+import type { VendorsService } from "../src/vendors/vendors.service";
+import { OrdersService } from "../src/orders/orders.service";
+import type { NotificationsService } from "../src/notifications/notifications.service";
+import { VendorInspectionsService } from "../src/vendor-inspections/vendor-inspections.service";
+
+describe("platform security rules", () => {
+  it("rejects administrator self-registration before database access", async () => {
+    const service = new AuthService(
+      {} as PrismaService,
+      {} as JwtService,
+      {} as ConfigService,
+    );
+    await expect(
+      service.register({
+        role: Role.ADMIN,
+        email: "admin@example.com",
+        password: "not-used-password",
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it("requires a six-digit pickup pincode for vendor registration", async () => {
+    const service = new AuthService(
+      {} as PrismaService,
+      {} as JwtService,
+      {} as ConfigService,
+    );
+    await expect(
+      service.register({
+        role: Role.VENDOR,
+        email: "vendor@example.com",
+        password: "not-used-password",
+        businessName: "Vendor",
+        ownerName: "Owner",
+        businessAddress: {
+          line1: "Market road",
+          city: "Buldhana",
+          state: "Maharashtra",
+        },
+      }),
+    ).rejects.toThrow("valid 6-digit vendor pickup pincode");
+  });
+
+  it("does not reveal whether a password-reset account exists", async () => {
+    const prisma = {
+      user: { findFirst: vi.fn().mockResolvedValue(null) },
+    } as unknown as PrismaService;
+    const service = new AuthService(
+      prisma,
+      {} as JwtService,
+      {} as ConfigService,
+    );
+    await expect(
+      service.forgotPassword({ emailOrMobile: "missing@example.com" }),
+    ).resolves.toEqual({
+      message:
+        "If the account exists, reset instructions will be sent securely.",
+    });
+  });
+
+  it("rejects an expired password-reset token", async () => {
+    const prisma = {
+      passwordResetToken: {
+        findUnique: vi.fn().mockResolvedValue({
+          userId: "user-id",
+          usedAt: null,
+          expiresAt: new Date(Date.now() - 1_000),
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new AuthService(
+      prisma,
+      {} as JwtService,
+      {} as ConfigService,
+    );
+    await expect(
+      service.resetPassword({ token: "expired", password: "StrongPass1" }),
+    ).rejects.toThrow("invalid or has expired");
+  });
+
+  it("requires independent strong JWT secrets and field encryption", () => {
+    expect(() =>
+      validateEnvironment({
+        DATABASE_URL: "postgresql://db",
+        JWT_ACCESS_SECRET: "short",
+        JWT_REFRESH_SECRET: "short",
+        BANK_DATA_ENCRYPTION_KEY: "bad",
+        CORS_ORIGINS: "http://localhost:5173",
+      }),
+    ).toThrow();
+  });
+
+  it("rejects wildcard CORS in production", () => {
+    expect(() =>
+      validateEnvironment({
+        NODE_ENV: "production",
+        DATABASE_URL: "postgresql://db",
+        JWT_ACCESS_SECRET: "a".repeat(32),
+        JWT_REFRESH_SECRET: "b".repeat(32),
+        BANK_DATA_ENCRYPTION_KEY: "c".repeat(64),
+        CORS_ORIGINS: "*",
+      }),
+    ).toThrow("Wildcard CORS");
+  });
+});
+
+describe("approval gates", () => {
+  it("does not approve a product owned by an unapproved vendor", async () => {
+    const prisma = {
+      product: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "product",
+          status: ProductStatus.PENDING_APPROVAL,
+          vendor: { status: VendorStatus.PENDING },
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new AdminService(prisma, {} as VendorsService);
+    await expect(service.approveProduct("product", "admin")).rejects.toThrow(
+      "Vendor must be approved",
+    );
+  });
+
+  it("does not reject an already approved vendor", async () => {
+    const prisma = {
+      vendor: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "vendor",
+          status: VendorStatus.APPROVED,
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new AdminService(prisma, {} as VendorsService);
+    await expect(
+      service.rejectVendor("vendor", "admin", "Invalid transition"),
+    ).rejects.toThrow("must be suspended, not rejected");
+  });
+
+  it("does not suspend a vendor before approval", async () => {
+    const prisma = {
+      vendor: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "vendor",
+          status: VendorStatus.PENDING,
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new AdminService(prisma, {} as VendorsService);
+    await expect(
+      service.suspendVendor(
+        "vendor",
+        "admin",
+        VendorSuspensionReason.OTHER,
+      ),
+    ).rejects.toThrow("Only an approved vendor can be suspended");
+  });
+
+  it("requires every physical inspection check before passing", async () => {
+    const prisma = {
+      vendorInspection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "inspection",
+          vendorId: "vendor",
+          status: InspectionStatus.IN_PROGRESS,
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new VendorInspectionsService(
+      prisma,
+      {} as VendorsService,
+    );
+    await expect(
+      service.update("inspection", "admin", {
+        status: InspectionStatus.PASSED,
+        checklist: { businessActivityVerified: true },
+        documentsVerified: true,
+        premisesVerified: true,
+        qualityVerified: false,
+      }),
+    ).rejects.toThrow("must all be verified");
+  });
+
+  it("requires business activity verification before passing", async () => {
+    const prisma = {
+      vendorInspection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "inspection",
+          vendorId: "vendor",
+          status: InspectionStatus.IN_PROGRESS,
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new VendorInspectionsService(
+      prisma,
+      {} as VendorsService,
+    );
+    await expect(
+      service.update("inspection", "admin", {
+        status: InspectionStatus.PASSED,
+        checklist: { businessActivityVerified: false },
+        documentsVerified: true,
+        premisesVerified: true,
+        qualityVerified: true,
+      }),
+    ).rejects.toThrow("Business activity must be verified");
+  });
+
+  it("allows an administrator to schedule a verified registered vendor", async () => {
+    const create = vi.fn().mockResolvedValue({ id: "inspection" });
+    const transition = vi.fn().mockResolvedValue({ status: VendorStatus.INSPECTION });
+    const prisma = {
+      vendor: {
+        findUnique: vi.fn().mockResolvedValue({ status: VendorStatus.REGISTERED }),
+      },
+      vendorInspection: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        create,
+      },
+    } as unknown as PrismaService;
+    const vendors = {
+      assertKycVerified: vi.fn().mockResolvedValue(undefined),
+      transition,
+    } as unknown as VendorsService;
+    const service = new VendorInspectionsService(prisma, vendors);
+    await service.create("vendor", "admin", {
+      scheduledAt: "2026-09-21T10:00:00.000Z",
+      location: "Vendor premises",
+      checklist: {},
+    });
+    expect(create).toHaveBeenCalledOnce();
+    expect(transition).toHaveBeenCalledWith(
+      "vendor",
+      "admin",
+      VendorStatus.INSPECTION,
+      "Physical inspection scheduled",
+    );
+  });
+
+  it("requires a reason when an inspection fails or needs review", async () => {
+    const prisma = {
+      vendorInspection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "inspection",
+          vendorId: "vendor",
+          status: InspectionStatus.IN_PROGRESS,
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new VendorInspectionsService(
+      prisma,
+      {} as VendorsService,
+    );
+    await expect(
+      service.update("inspection", "admin", {
+        status: InspectionStatus.NEEDS_REVIEW,
+        documentsVerified: true,
+        premisesVerified: false,
+        qualityVerified: true,
+      }),
+    ).rejects.toThrow("A reason is required");
+  });
+
+  it("persists a rescheduled inspection through the existing update flow", async () => {
+    const update = vi.fn().mockResolvedValue({ id: "inspection" });
+    const auditCreate = vi.fn().mockResolvedValue({ id: "audit" });
+    const prisma = {
+      vendorInspection: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "inspection",
+          vendorId: "vendor",
+          status: InspectionStatus.SCHEDULED,
+          scheduledAt: new Date("2026-09-20T10:00:00.000Z"),
+          location: "Old location",
+        }),
+        update,
+      },
+      auditLog: { create: auditCreate },
+    } as unknown as PrismaService;
+    const service = new VendorInspectionsService(
+      prisma,
+      {} as VendorsService,
+    );
+    await service.update("inspection", "admin", {
+      status: InspectionStatus.SCHEDULED,
+      scheduledAt: "2026-09-21T10:00:00.000Z",
+      location: "New location",
+      documentsVerified: false,
+      premisesVerified: false,
+      qualityVerified: false,
+    });
+    expect(update).toHaveBeenCalledOnce();
+    const [updateInput] = update.mock.calls[0] as unknown as [
+      { data: { scheduledAt: Date; location: string } },
+    ];
+    expect(updateInput.data.scheduledAt).toEqual(
+      new Date("2026-09-21T10:00:00.000Z"),
+    );
+    expect(updateInput.data.location).toBe("New location");
+    expect(auditCreate).toHaveBeenCalledOnce();
+  });
+});
+
+describe("vendor ownership", () => {
+  it("does not return an order belonging to another vendor", async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    const prisma = {
+      vendorOrder: { findFirst },
+    } as unknown as PrismaService;
+    const vendors = {
+      getVendorId: vi.fn().mockResolvedValue("vendor-a"),
+    } as unknown as VendorsService;
+    const service = new OrdersService(
+      prisma,
+      vendors,
+      {} as ConfigService,
+      {} as NotificationsService,
+    );
+    await expect(service.vendorGet("user-a", "vendor-b-order")).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "vendor-b-order", vendorId: "vendor-a" },
+      }),
+    );
+  });
+});

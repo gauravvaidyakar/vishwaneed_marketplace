@@ -1,4 +1,4 @@
-import { Instagram, Mail, MapPin, Phone } from 'lucide-react';
+import { Bell, MessageSquare, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export function Footer() {
@@ -9,9 +9,9 @@ export function Footer() {
           <Link className="brand brand--footer" to="/"><span className="brand-mark">V</span><span><strong>Vishwaneed</strong><small>Made in India. Made for you.</small></span></Link>
           <p>Connecting trusted rural producers with homes across India through a transparent marketplace.</p>
         </div>
-        <div><h2>Shop</h2><Link to="/products">All products</Link><Link to="/products?category=cat-millets">Millets</Link><Link to="/products?category=cat-jaggery">Jaggery</Link><Link to="/products?category=cat-pickles">Pickles</Link></div>
-        <div><h2>Customer care</h2><Link to="/account">My account</Link><Link to="/addresses">Addresses</Link><span>Shipping & returns</span><span>Help centre</span></div>
-        <div><h2>Contact</h2><span><MapPin size={16} /> Pune, Maharashtra</span><span><Phone size={16} /> +91 00000 00000</span><span><Mail size={16} /> care@vishwaneed.example</span><span><Instagram size={16} /> @vishwaneed</span></div>
+        <div><h2>Shop</h2><Link to="/products">All products</Link><Link to="/products?category=millets">Millets</Link><Link to="/products?category=jaggery">Jaggery</Link><Link to="/products?category=food-products">Food products</Link></div>
+        <div><h2>Customer care</h2><Link to="/account">My account</Link><Link to="/orders">My orders</Link><Link to="/addresses">Addresses</Link><Link to="/complaints">Complaints & support</Link></div>
+        <div><h2>Trust & support</h2><span><ShieldCheck size={16} /> Approved products only</span><Link to="/complaints"><MessageSquare size={16} /> Customer support</Link><Link to="/notifications"><Bell size={16} /> Notifications</Link></div>
       </div>
       <div className="shell footer-bottom"><span>© {new Date().getFullYear()} Vishwaneed Marketplace</span><span>Privacy · Terms · Accessibility</span></div>
     </footer>

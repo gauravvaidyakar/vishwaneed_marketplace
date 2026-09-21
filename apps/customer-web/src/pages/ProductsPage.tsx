@@ -15,6 +15,7 @@ export function ProductsPage() {
   const query = useMemo(() => ({
     search: params.get('search') || undefined,
     category: params.get('category') || undefined,
+    vendorId: params.get('vendorId') || undefined,
     productType: (params.get('productType') || undefined) as ProductType | undefined,
     minPrice: params.get('minPrice') ? Number(params.get('minPrice')) : undefined,
     maxPrice: params.get('maxPrice') ? Number(params.get('maxPrice')) : undefined,

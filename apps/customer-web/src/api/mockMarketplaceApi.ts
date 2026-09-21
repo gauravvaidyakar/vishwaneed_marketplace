@@ -1,5 +1,6 @@
 import { ApiError } from './errors';
 import { mockCategories, mockProducts } from './mockData';
+import { mockPostPurchase } from './mockPostPurchase';
 import type {
   Address,
   AddressInput,
@@ -103,6 +104,7 @@ export function createMockMarketplaceApi(): MarketplaceApi {
       let items = mockProducts.filter((product) =>
         (!search || `${product.name} ${product.vendor.name} ${product.categoryName}`.toLowerCase().includes(search)) &&
         (!query.category || product.categoryId === query.category || product.categoryName.toLowerCase() === query.category.toLowerCase()) &&
+        (!query.vendorId || product.vendor.id === query.vendorId) &&
         (!query.productType || product.productType === query.productType) &&
         (query.minPrice === undefined || product.price.amount >= query.minPrice) &&
         (query.maxPrice === undefined || product.price.amount <= query.maxPrice) &&
@@ -127,6 +129,10 @@ export function createMockMarketplaceApi(): MarketplaceApi {
       if (!product) throw new ApiError('Product not found.', 404, 'PRODUCT_NOT_FOUND');
       return product;
     },
+    async getProductReviews() {
+      await wait();
+      return [];
+    },
     async login(input: LoginInput): Promise<AuthSession> {
       await wait();
       if (!input.password) throw new ApiError('Password is required.', 422, 'VALIDATION_ERROR');
@@ -141,6 +147,7 @@ export function createMockMarketplaceApi(): MarketplaceApi {
     },
     async forgotPassword() {
       await wait();
+      return { message: 'If the account exists, reset instructions will be sent securely.' };
     },
     async resetPassword() {
       await wait();
@@ -176,6 +183,18 @@ export function createMockMarketplaceApi(): MarketplaceApi {
       await wait();
       writeJson(CART_KEY, getStoredCart().filter((line) => line.id !== itemId));
       return buildCart();
+    },
+    async refreshCart() {
+      await wait();
+      return buildCart();
+    },
+    async getCustomerProfile() {
+      await wait();
+      return mockPostPurchase.getProfile();
+    },
+    async updateCustomerProfile(input) {
+      await wait();
+      return mockPostPurchase.updateProfile(input);
     },
     async getAddresses() {
       await wait();
@@ -237,15 +256,86 @@ export function createMockMarketplaceApi(): MarketplaceApi {
       const suffix = String(Date.now()).slice(-6);
       const confirmation: OrderConfirmation = {
         masterOrderId: `DEV-${suffix}`,
+        masterOrderNumber: `DEV-${suffix}`,
         paymentMethod: 'COD',
         paymentStatus: 'COD_PENDING',
+        status: 'CONFIRMED',
+        productSubtotal: lastQuote.productSubtotal,
+        totalShipping: lastQuote.totalShipping,
         payableTotal: lastQuote.payableTotal,
         placedAt,
-        vendorOrders: lastQuote.vendors.map((group, index) => ({ id: `DEV-${suffix}-${index + 1}`, vendorName: group.vendor.name, amount: money(group.productSubtotal.amount + group.shipping.amount), status: 'CONFIRMED', estimatedDelivery: group.estimatedDelivery })),
+        deliveryAddress: readJson<Address[]>(ADDRESS_KEY, defaultAddresses).find((address) => address.id === input.addressId)!,
+        vendorOrders: lastQuote.vendors.map((group, index) => ({
+          id: `DEV-${suffix}-${index + 1}`,
+          vendor: group.vendor,
+          status: 'CONFIRMED',
+          productSubtotal: group.productSubtotal,
+          shipping: group.shipping,
+          orderTotal: money(group.productSubtotal.amount + group.shipping.amount),
+          estimatedDelivery: group.estimatedDelivery,
+          items: group.items.map((line) => ({ id: `DEV-ITEM-${line.id}`, productId: line.product.id, productName: line.product.name, productSlug: line.product.slug, imageUrl: line.product.images[0]!, weight: line.product.weight, quantity: line.quantity, unitPrice: line.currentUnitPrice, lineTotal: money(line.currentUnitPrice.amount * line.quantity), status: 'CONFIRMED', actions: { canCancel: true, canReturn: false, canReview: false, canRaiseComplaint: true, returnIneligibleReason: 'The backend has not marked this item delivered and return eligible.' } })),
+        })),
       };
+      mockPostPurchase.addOrder(confirmation);
       writeJson(CART_KEY, []);
       lastQuote = null;
       return confirmation;
+    },
+    async createPayment() {
+      await wait();
+      throw new ApiError('Razorpay checkout requires Developer 2 payment creation and verification APIs.', 501, 'PAYMENT_PROVIDER_UNAVAILABLE');
+    },
+    async verifyPayment() {
+      await wait();
+      throw new ApiError('Payment verification is unavailable in the development adapter.', 501, 'PAYMENT_VERIFICATION_UNAVAILABLE');
+    },
+    async getPaymentStatus() {
+      await wait();
+      throw new ApiError('Payment status is unavailable in the development adapter.', 501, 'PAYMENT_STATUS_UNAVAILABLE');
+    },
+    async getOrders(query) {
+      await wait();
+      return mockPostPurchase.getOrders(query);
+    },
+    async getOrder(orderId) {
+      await wait();
+      return mockPostPurchase.getOrder(orderId);
+    },
+    async getShipmentTracking(shipmentId) {
+      await wait();
+      return mockPostPurchase.getShipment(shipmentId);
+    },
+    async cancelOrderItem(orderId, itemId, input) {
+      await wait();
+      return mockPostPurchase.cancelItem(orderId, itemId, input);
+    },
+    async createReturn(orderId, itemId, input) {
+      await wait();
+      return mockPostPurchase.createReturn(orderId, itemId, input);
+    },
+    async createReview(productId, input) {
+      await wait();
+      return mockPostPurchase.createReview(productId, input);
+    },
+    async getComplaints() {
+      await wait();
+      return mockPostPurchase.getComplaints();
+    },
+    async getComplaint(complaintId) {
+      await wait();
+      return mockPostPurchase.getComplaint(complaintId);
+    },
+    async createComplaint(input) {
+      await wait();
+      return mockPostPurchase.createComplaint(input);
+    },
+    async addComplaintMessage(complaintId, message) {
+      await wait();
+      return mockPostPurchase.addComplaintMessage(complaintId, message);
+    },
+    async getNotifications() {
+      await wait();
+      return [];
     },
   };
 }

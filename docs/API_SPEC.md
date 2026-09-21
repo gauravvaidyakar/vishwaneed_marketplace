@@ -117,7 +117,9 @@ GET /api/v1/vendor/orders/:id
 
 PATCH /api/v1/vendor/orders/:id/status
 
-POST /api/v1/vendor/orders/:id/cancel-item
+POST /api/v1/vendor/orders/:id/cancel-item/:itemId
+
+POST /api/v1/orders/:orderId/items/:itemId/cancel
 
 ---
 
@@ -155,21 +157,19 @@ POST /api/v1/payments/verify
 
 POST /api/v1/payments/webhook
 
-POST /api/v1/payments/:id/refund
+GET /api/v1/payments/:id/status
+
+POST /api/v1/payments/:id/reconcile
 
 ---
 
 # 12. SHIPPING
 
-POST /api/v1/shipments
-
-GET /api/v1/shipments/:id
-
-GET /api/v1/orders/:id/shipments
+POST /api/v1/shipments/vendor-orders/:id
 
 GET /api/v1/shipments/:id/tracking
 
-POST /api/v1/shipments/webhook
+POST /api/v1/shipments/webhook/shiprocket
 
 ---
 
@@ -178,6 +178,10 @@ POST /api/v1/shipments/webhook
 POST /api/v1/orders/:orderId/items/:itemId/return
 
 GET /api/v1/returns
+
+GET /api/v1/admin/returns
+
+POST /api/v1/admin/returns/:id/status
 
 GET /api/v1/returns/:id
 
@@ -218,6 +222,8 @@ POST /api/v1/complaints/:id/messages
 ---
 
 # 17. ADMIN VENDORS
+
+GET /api/v1/admin/customers
 
 GET /api/v1/admin/vendors
 
@@ -319,6 +325,10 @@ GET /api/v1/admin/settlements/:id
 
 POST /api/v1/admin/settlements/:id/process
 
+POST /api/v1/admin/settlements/refresh-eligibility
+
+POST /api/v1/admin/settlements/:id/complete
+
 ---
 
 # 26. REFUNDS
@@ -329,11 +339,11 @@ GET /api/v1/admin/refunds/:id
 
 POST /api/v1/admin/refunds/:id/process
 
+POST /api/v1/admin/refunds/:id/complete-bank-transfer
+
 ---
 
 # 27. NOTIFICATIONS
-
-POST /api/v1/notifications/whatsapp
 
 GET /api/v1/notifications
 

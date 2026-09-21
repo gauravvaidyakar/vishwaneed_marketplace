@@ -1,6 +1,7 @@
 import type { AuthSession } from '../api/types';
 
 const SESSION_KEY = 'vishwaneed.customer.session';
+export const AUTH_EXPIRED_EVENT = 'vishwaneed:auth-expired';
 
 export const sessionStorage = {
   get(): AuthSession | null {
@@ -18,5 +19,9 @@ export const sessionStorage = {
   },
   clear(): void {
     window.localStorage.removeItem(SESSION_KEY);
+  },
+  expire(): void {
+    window.localStorage.removeItem(SESSION_KEY);
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
   },
 };

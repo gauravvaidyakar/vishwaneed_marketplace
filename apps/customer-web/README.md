@@ -18,7 +18,7 @@ VITE_API_MODE=mock
 VITE_API_URL=/api/v1
 ```
 
-- `VITE_API_MODE=mock` uses local catalogue, account, cart, address, quote, and COD-order responses. The UI always identifies this mode.
+- `VITE_API_MODE=mock` uses local catalogue, account, cart, address, quote, COD-order, order-history, tracking, return, review, and complaint responses. The UI always identifies this mode. It intentionally does not simulate a successful Razorpay payment.
 - `VITE_API_MODE=http` uses the centralized HTTP adapter and `VITE_API_URL`. Do not place secrets in Vite environment variables.
 
 ## Quality checks
@@ -32,4 +32,4 @@ npm run build
 
 ## Backend integration
 
-The frontend contract is in `src/api/types.ts`; live endpoint mapping is in `src/api/httpMarketplaceApi.ts`. Backend-calculated checkout quotes remain authoritative for product totals, GST-inclusive prices, vendor shipping, stock, and the final payable amount. Prepaid checkout stays disabled in mock mode until payment creation and verification are available.
+The frontend contract is in `src/api/types.ts`; live endpoint mapping is in `src/api/httpMarketplaceApi.ts`. The cross-team endpoint checklist is in `../../docs/CUSTOMER_API_REQUIREMENTS.md`. Backend-calculated checkout quotes remain authoritative for product totals, GST-inclusive prices, vendor shipping, stock, final payable amount, refund eligibility, and refund values. Prepaid checkout stays disabled in mock mode until payment creation, verification, and status APIs are available.
