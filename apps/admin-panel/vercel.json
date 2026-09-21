@@ -4,7 +4,12 @@
   "installCommand": "cd ../.. && npm ci",
   "buildCommand": "cd ../.. && npm run build --workspace @vishwaneed/admin-panel",
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/", "destination": "/admin", "permanent": false }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/admin/assets/:path*", "destination": "/assets/:path*" },
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/:path*", "destination": "/index.html" }
   ]
 }

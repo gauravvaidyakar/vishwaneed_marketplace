@@ -2217,6 +2217,7 @@ export function App() {
       <Route element={<Protected />}>
         <Route element={<Layout />}>
           <Route index element={<DashboardPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
           <Route path="vendors" element={<VendorsPage />} />
           <Route path="customers" element={<Resource kind="customers" />} />
           <Route path="products" element={<Products />} />

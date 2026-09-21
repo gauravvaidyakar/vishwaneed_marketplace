@@ -11,8 +11,8 @@ in production.
 
 During initial Blueprint creation, provide:
 
-- `CORS_ORIGINS`: comma-separated customer, vendor, and admin Vercel origins
-- `CUSTOMER_WEB_URL`: customer Vercel origin
+- `CORS_ORIGINS`: the single public marketplace origin
+- `CUSTOMER_WEB_URL`: the single public marketplace origin
 - `ADMIN_EMAIL`: initial production administrator email
 - `ADMIN_PASSWORD`: strong unique password (minimum 12 characters)
 
@@ -23,15 +23,26 @@ encrypted in PostgreSQL.
 ## Vercel frontends
 
 Create three Vercel projects from the same Git repository with these Root
-Directories:
+Directories. The customer project is the public gateway; the admin and vendor
+projects are implementation origins reached through its rewrites.
 
 | Project | Root Directory | Production environment variables |
 | --- | --- | --- |
-| Customer | `apps/customer-web` | `VITE_API_MODE=http`, `VITE_API_URL=https://<render-host>/api/v1` |
+| Customer / public gateway | `apps/customer-web` | `VITE_API_MODE=http`, `VITE_API_URL=https://<render-host>/api/v1` |
 | Vendor | `apps/vendor-panel` | `VITE_API_BASE_URL=https://<render-host>/api/v1` |
 | Admin | `apps/admin-panel` | `VITE_API_BASE_URL=https://<render-host>/api/v1` |
 
-Each app includes a Vercel SPA rewrite so deep links resolve to `index.html`.
+Public routing is:
+
+- `/` and customer routes -> customer bundle
+- `/admin` and `/admin/*` -> existing admin bundle
+- `/vendor` and `/vendor/*` -> existing vendor bundle
+- `/api/*` -> Render API
+
+The admin and vendor production builds use `/admin/` and `/vendor/` asset and
+React Router bases. Their Vercel projects rewrite those deep links to the
+corresponding SPA entry point. The public gateway routes the prefixes before
+its customer SPA fallback, so it must remain the only user-facing domain.
 
 ## Post-deployment checks
 

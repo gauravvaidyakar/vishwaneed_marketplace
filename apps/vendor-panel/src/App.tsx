@@ -33,13 +33,17 @@ export function App() {
         <Route element={<Protected />}>
           <Route element={<Layout />}>
             <Route index element={<DashboardPage />} />
+            <Route path="dashboard" element={<DashboardPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="products" element={<ProductsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="orders" element={<OrdersPage />} />
             <Route path="operations" element={<OperationsPage />} />
+            <Route path="returns" element={<OperationsPage />} />
+            <Route path="replacements" element={<OperationsPage />} />
             <Route path="support" element={<SupportPage />} />
             <Route path="finance" element={<FinancePage />} />
+            <Route path="settlements" element={<FinancePage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

@@ -5,6 +5,26 @@
   "buildCommand": "cd ../.. && npm run build --workspace @vishwaneed/customer-web",
   "outputDirectory": "dist",
   "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "https://vishwaneed-marketplace-admin-panel.vercel.app/admin"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "https://vishwaneed-marketplace-admin-panel.vercel.app/admin/:path*"
+    },
+    {
+      "source": "/vendor",
+      "destination": "https://vishwaneed-marketplace-vendor-panel.vercel.app/vendor"
+    },
+    {
+      "source": "/vendor/:path*",
+      "destination": "https://vishwaneed-marketplace-vendor-panel.vercel.app/vendor/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://vishwaneed-api.onrender.com/api/:path*"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

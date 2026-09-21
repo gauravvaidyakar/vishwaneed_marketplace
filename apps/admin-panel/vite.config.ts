@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   return {
+    base: mode === "production" ? "/admin/" : "/",
     plugins: [react()],
     server: {
       port: 5175,
