@@ -597,6 +597,21 @@ p {
 .inspection-actions {
   flex-wrap: wrap;
 }
+
+.approval-guidance {
+  display: grid;
+  gap: 0.25rem;
+  margin: 1.25rem 0 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid #e8c979;
+  border-radius: 0.75rem;
+  background: #fff8df;
+  color: #72500b;
+}
+
+.approval-guidance strong {
+  color: #4f3707;
+}
 .result-options {
   display: flex;
   flex-wrap: wrap;

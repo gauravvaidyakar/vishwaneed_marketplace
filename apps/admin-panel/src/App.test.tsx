@@ -256,6 +256,13 @@ describe("physical inspection workflow", () => {
       await screen.findByRole("button", { name: "Reschedule" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve vendor" })).toBeDisabled();
+    expect(screen.getByText("Approval is locked")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Complete the physical inspection and mark every required check as verified.",
+      ),
+    ).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Conduct inspection" }),
     );

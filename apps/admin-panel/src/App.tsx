@@ -465,6 +465,18 @@ function VendorDrawer({ id, close }: { id: string; close: () => void }) {
         inspection.status,
       ),
     ) ?? false;
+  const approvalBlockers = [
+    !documentsReady ? "Verify every required KYC document." : undefined,
+    !bankReady ? "Verify the vendor bank account." : undefined,
+    !inspectionReady
+      ? hasActiveInspection
+        ? "Complete the physical inspection and mark every required check as verified."
+        : "Schedule and pass the physical inspection."
+      : undefined,
+    inspectionReady && q.data?.status !== "PENDING"
+      ? "Refresh the vendor record so its status can move to pending approval."
+      : undefined,
+  ].filter((message): message is string => Boolean(message));
   return (
     <div className="drawer-bg">
       <aside className="drawer">
@@ -727,6 +739,17 @@ function VendorDrawer({ id, close }: { id: string; close: () => void }) {
                   </div>
                 </form>
               )}
+              {!approvalReady &&
+                !["APPROVED", "SUSPENDED"].includes(q.data.status) && (
+                <div
+                  className="approval-guidance"
+                  id={`vendor-approval-help-${id}`}
+                  role="status"
+                >
+                  <strong>Approval is locked</strong>
+                  <span>{approvalBlockers[0]}</span>
+                </div>
+                )}
               <footer>
                 {q.data.status === "APPROVED" ? (
                   <>
@@ -755,6 +778,9 @@ function VendorDrawer({ id, close }: { id: string; close: () => void }) {
                     <button
                       className="primary"
                       disabled={!approvalReady || action.isPending}
+                      aria-describedby={
+                        approvalReady ? undefined : `vendor-approval-help-${id}`
+                      }
                       title={
                         approvalReady
                           ? "Approve vendor"
