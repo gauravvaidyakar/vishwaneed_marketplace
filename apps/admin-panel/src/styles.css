@@ -22,6 +22,11 @@ input,
 select,
 textarea {
   font: inherit;
+  min-width: 0;
+  max-width: 100%;
+}
+img {
+  max-width: 100%;
 }
 button {
   cursor: pointer;
@@ -825,7 +830,7 @@ p {
     font-size: 3rem;
   }
 }
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .shell {
     display: block;
   }
@@ -865,6 +870,8 @@ p {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+@media (max-width: 720px) {
   .work main {
     padding: 24px 14px;
   }

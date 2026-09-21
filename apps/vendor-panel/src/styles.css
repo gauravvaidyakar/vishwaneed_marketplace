@@ -25,6 +25,11 @@ input,
 select,
 textarea {
   font: inherit;
+  min-width: 0;
+  max-width: 100%;
+}
+img {
+  max-width: 100%;
 }
 button,
 a {
@@ -923,7 +928,7 @@ th {
     flex-wrap: wrap;
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .app-shell {
     display: block;
   }
@@ -965,6 +970,8 @@ th {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+}
+@media (max-width: 760px) {
   .workspace main {
     padding: 25px 16px;
   }

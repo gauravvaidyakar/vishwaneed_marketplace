@@ -108,7 +108,7 @@ function Layout() {
       if (event.key === "Escape") setOpen(false);
     };
     const closeAtDesktop = () => {
-      if (window.innerWidth > 720) setOpen(false);
+      if (window.innerWidth > 900) setOpen(false);
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
