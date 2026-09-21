@@ -101,6 +101,24 @@ function Layout() {
   const [open, setOpen] = useState(false);
   const { session, logout } = useAuth();
   const location = useLocation();
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    const closeAtDesktop = () => {
+      if (window.innerWidth > 720) setOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", closeAtDesktop);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", closeAtDesktop);
+    };
+  }, [open]);
   return (
     <div className="shell">
       <aside className={open ? "open" : ""}>
@@ -110,7 +128,10 @@ function Layout() {
             <strong>Vishwaneed</strong>
             <small>Marketplace administration</small>
           </div>
-          <button onClick={() => setOpen(false)}>
+          <button
+            aria-label="Close navigation menu"
+            onClick={() => setOpen(false)}
+          >
             <X />
           </button>
         </div>
@@ -134,7 +155,11 @@ function Layout() {
       </aside>
       <section className="work">
         <header>
-          <button className="menu" onClick={() => setOpen(true)}>
+          <button
+            className="menu"
+            aria-label="Open navigation menu"
+            onClick={() => setOpen(true)}
+          >
             <Menu />
           </button>
           <div>
@@ -148,6 +173,13 @@ function Layout() {
           </PageBoundary>
         </main>
       </section>
+      {open && (
+        <button
+          className="admin-scrim"
+          aria-label="Close navigation overlay"
+          onClick={() => setOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -143,6 +143,35 @@ describe("admin routes", () => {
       await screen.findByRole("heading", { name: heading }),
     ).toBeInTheDocument();
   });
+
+  it("opens and closes the responsive navigation", async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AuthProvider>
+          <QueryClientProvider
+            client={new QueryClient({
+              defaultOptions: { queries: { retry: false } },
+            })}
+          >
+            <App />
+          </QueryClientProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+    await screen.findByRole("heading", { name: "Marketplace overview" });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open navigation menu" }),
+    );
+    expect(container.querySelector("aside")).toHaveClass("open");
+    expect(document.body.style.overflow).toBe("hidden");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close navigation overlay" }),
+    );
+    expect(container.querySelector("aside")).not.toHaveClass("open");
+    expect(document.body.style.overflow).toBe("");
+  });
 });
 
 describe("physical inspection workflow", () => {

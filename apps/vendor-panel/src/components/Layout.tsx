@@ -15,7 +15,7 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
 const links = [
@@ -33,6 +33,24 @@ const links = [
 export function Layout() {
   const [open, setOpen] = useState(false);
   const { session, logout } = useAuth();
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    const closeAtDesktop = () => {
+      if (window.innerWidth > 760) setOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", closeAtDesktop);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", closeAtDesktop);
+    };
+  }, [open]);
   return (
     <div className="app-shell">
       <aside className={open ? "sidebar open" : "sidebar"}>
@@ -42,7 +60,11 @@ export function Layout() {
             <strong>Vishwaneed</strong>
             <small>Vendor workspace</small>
           </div>
-          <button className="mobile-only" onClick={() => setOpen(false)}>
+          <button
+            className="mobile-only"
+            aria-label="Close navigation menu"
+            onClick={() => setOpen(false)}
+          >
             <X />
           </button>
         </div>
@@ -66,7 +88,11 @@ export function Layout() {
       </aside>
       <div className="workspace">
         <header>
-          <button className="menu" onClick={() => setOpen(true)}>
+          <button
+            className="menu"
+            aria-label="Open navigation menu"
+            onClick={() => setOpen(true)}
+          >
             <Menu />
           </button>
           <div>
@@ -86,7 +112,7 @@ export function Layout() {
       {open && (
         <button
           className="scrim"
-          aria-label="Close menu"
+          aria-label="Close navigation overlay"
           onClick={() => setOpen(false)}
         >
           <ChevronLeft />
