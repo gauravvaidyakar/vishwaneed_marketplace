@@ -3,8 +3,11 @@
 ## Render backend
 
 The repository-root `render.yaml` provisions the NestJS API, PostgreSQL,
-database migrations, the idempotent production seed, a health check, and a
-persistent disk for public/private uploads.
+database migrations, the idempotent production seed, and a health check.
+It currently uses Render's free plans. Files written by the public/private
+upload adapters are ephemeral on this plan and can be lost on restart; use a
+paid persistent disk or private object-storage adapter before relying on uploads
+in production.
 
 During initial Blueprint creation, provide:
 
@@ -39,8 +42,8 @@ Each app includes a Vercel SPA rewrite so deep links resolve to `index.html`.
 5. Razorpay order creation and signed webhook verification in test mode.
 6. Shiprocket authentication/rate lookup and signed webhook verification.
 7. Interakt approved-template delivery to an opted-in test number.
-8. Public image persistence and authorized private document downloads after an
-   API redeploy.
+8. Authorized public/private file access. Persistence across redeploys requires
+   upgrading storage from the free ephemeral filesystem.
 
 Do not perform a real payment, shipment purchase, or production WhatsApp send as
 part of an automated smoke test.

@@ -2,16 +2,12 @@ services:
   - type: web
     name: vishwaneed-api
     runtime: node
-    plan: 0.5c-512mb
+    plan: free
     region: singapore
     autoDeployTrigger: commit
     buildCommand: npm ci --include=dev && npm run prisma:generate --workspace @vishwaneed/api && npm run build --workspace @vishwaneed/api
     startCommand: npm run prisma:migrate --workspace @vishwaneed/api && npm run prisma:seed --workspace @vishwaneed/api && node apps/api/dist/main.js
     healthCheckPath: /api/v1/categories
-    disk:
-      name: vishwaneed-uploads
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
@@ -34,9 +30,9 @@ services:
       - key: ADMIN_PASSWORD
         sync: false
       - key: PRIVATE_UPLOAD_DIR
-        value: /var/data/private-uploads
+        value: /opt/render/project/src/apps/api/private-uploads
       - key: PUBLIC_UPLOAD_DIR
-        value: /var/data/public-uploads
+        value: /opt/render/project/src/apps/api/public-uploads
       - key: INTERAKT_API_URL
         value: https://api.interakt.ai/v1/public/message/
       - key: SETTLEMENT_DAYS
@@ -48,7 +44,7 @@ services:
 
 databases:
   - name: vishwaneed-postgres
-    plan: 0.1c-256mb
+    plan: free
     region: singapore
     databaseName: vishwaneed
     user: vishwaneed
