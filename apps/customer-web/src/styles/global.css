@@ -134,7 +134,7 @@ h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.12; }
 .home-section-heading h2 { font: 800 clamp(1.15rem, 2.2vw, 1.55rem) 'DM Sans', sans-serif; letter-spacing: .02em; text-transform: uppercase; }
 .home-category-rail { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: clamp(12px, 2vw, 24px); }
 .home-category-card { min-width: 0; display: grid; justify-items: center; align-content: start; gap: 10px; text-align: center; }
-.home-category-card img, .home-category-fallback, .home-category-more > span { width: clamp(74px, 7.5vw, 98px); aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; border: 1px solid #dedbd1; border-radius: 50%; background: white; object-fit: cover; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; height: clamp(74px, 7.5vw, 98px);}
+.home-category-card img, .home-category-fallback, .home-category-more > span { width: clamp(74px, 7.5vw, 98px); aspect-ratio: 1; display: grid; place-items: center; overflow: hidden; border: 1px solid #dedbd1; border-radius: 50%; background: white; object-fit: cover; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;}
 .home-category-fallback { color: var(--muted); background: #f0eee6; }
 .home-category-more > span { color: var(--green-900); font-size: 1.35rem; letter-spacing: .06em; }
 .home-category-card h3 { margin: 0; font-size: .78rem; line-height: 1.25; }
