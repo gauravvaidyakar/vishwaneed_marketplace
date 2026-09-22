@@ -423,6 +423,37 @@ th {
 .success {
   color: var(--green);
 }
+.form-success {
+  padding: 11px 12px;
+  border: 1px solid #b9ddc5;
+  border-radius: 8px;
+  color: #17623a;
+  background: #eef8f1;
+}
+.security-card > svg {
+  width: 34px;
+  height: 34px;
+  padding: 8px;
+  border-radius: 9px;
+  color: var(--green);
+  background: var(--soft);
+}
+.security-form,
+.password-result {
+  display: grid;
+  gap: 14px;
+  margin-top: 20px;
+}
+.security-form .primary,
+.password-result .primary,
+.password-result .secondary {
+  width: 100%;
+  text-align: center;
+}
+.password-hint {
+  color: var(--muted);
+  line-height: 1.45;
+}
 .alert {
   padding: 12px;
   border-radius: 8px;

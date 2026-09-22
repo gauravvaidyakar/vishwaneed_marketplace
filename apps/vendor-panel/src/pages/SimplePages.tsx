@@ -1,7 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bell, KeyRound, Shield } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { z } from "zod";
 import { api } from "../api/client";
+import { useAuth } from "../auth/AuthProvider";
 import { AsyncState, Status } from "../components/AsyncState";
+import { Field } from "./AuthPages";
 import { PageHead } from "./DashboardPage";
 interface Notification {
   id: string;
@@ -50,6 +56,57 @@ export function NotificationsPage() {
   );
 }
 export function SettingsPage() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const schema = z
+    .object({
+      currentPassword: z.string().min(1, "Enter your current password"),
+      newPassword: z
+        .string()
+        .min(10, "Use at least 10 characters")
+        .regex(/[A-Z]/, "Include an uppercase letter")
+        .regex(/[0-9]/, "Include a number"),
+      confirmNewPassword: z.string(),
+    })
+    .refine((values) => values.newPassword === values.confirmNewPassword, {
+      message: "Passwords do not match",
+      path: ["confirmNewPassword"],
+    })
+    .refine((values) => values.currentPassword !== values.newPassword, {
+      message: "Use a password different from your current password",
+      path: ["newPassword"],
+    });
+  type PasswordForm = z.infer<typeof schema>;
+  const form = useForm<PasswordForm>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      currentPassword: "",
+      newPassword: "",
+      confirmNewPassword: "",
+    },
+  });
+  const changePassword = useMutation({
+    mutationFn: (values: PasswordForm) =>
+      api.post<{ message: string; requiresReauthentication: true }>(
+        "/auth/vendor/change-password",
+        values,
+      ),
+    onSuccess: async (result) => {
+      form.reset();
+      sessionStorage.setItem("vishwaneed.vendor.auth.notice", result.message);
+      try {
+        await logout();
+      } catch {
+        // The password endpoint already revoked the refresh session. The auth
+        // provider clears local state in its finally block even if logout is
+        // unreachable, so the vendor is still forced to authenticate again.
+      }
+      void navigate("/login", {
+        replace: true,
+        state: { notice: result.message },
+      });
+    },
+  });
   return (
     <>
       <PageHead
@@ -66,14 +123,65 @@ export function SettingsPage() {
             returned to sign-in when refresh is rejected.
           </p>
         </section>
-        <section className="card">
+        <section className="card security-card">
           <KeyRound />
           <h2>Password management</h2>
           <p className="muted">
-            The backend currently has no vendor password-change or
-            password-reset endpoint. No insecure frontend-only password flow has
-            been added.
+            Changing your password revokes the current refresh session and
+            requires you to sign in again.
           </p>
+          <form
+            className="security-form"
+            noValidate
+            onSubmit={(event) =>
+              void form.handleSubmit((values) =>
+                changePassword.mutateAsync(values),
+              )(event)
+            }
+          >
+            <Field
+              label="Current password"
+              error={form.formState.errors.currentPassword?.message}
+            >
+              <input
+                type="password"
+                autoComplete="current-password"
+                {...form.register("currentPassword")}
+              />
+            </Field>
+            <Field
+              label="New password"
+              error={form.formState.errors.newPassword?.message}
+            >
+              <input
+                type="password"
+                autoComplete="new-password"
+                {...form.register("newPassword")}
+              />
+            </Field>
+            <Field
+              label="Confirm new password"
+              error={form.formState.errors.confirmNewPassword?.message}
+            >
+              <input
+                type="password"
+                autoComplete="new-password"
+                {...form.register("confirmNewPassword")}
+              />
+            </Field>
+            <small className="password-hint">
+              At least 10 characters, including an uppercase letter and a
+              number.
+            </small>
+            {changePassword.error && (
+              <p className="form-error" role="alert">
+                {changePassword.error.message}
+              </p>
+            )}
+            <button className="primary" disabled={changePassword.isPending}>
+              {changePassword.isPending ? "Changing password…" : "Change password"}
+            </button>
+          </form>
         </section>
       </div>
     </>

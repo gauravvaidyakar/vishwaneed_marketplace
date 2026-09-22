@@ -109,6 +109,12 @@ GET /api/v1/vendor/kyc/status
 
 PATCH /api/v1/vendor/contact
 
+POST /api/v1/auth/vendor/change-password
+
+Authenticated vendor password change. Requires `currentPassword`, `newPassword`
+and `confirmNewPassword`. A successful change revokes the stored refresh session
+and requires the vendor to sign in again.
+
 ---
 
 # 8. VENDOR ORDERS

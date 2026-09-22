@@ -1,8 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import { z } from "zod";
+import { api } from "../api/client";
 import { useAuth } from "../auth/AuthProvider";
 const loginSchema = z.object({
   identifier: z.string().min(3, "Enter your email or mobile number"),
@@ -13,6 +20,13 @@ export function LoginPage() {
   const { session, login } = useAuth();
   const [error, setError] = useState("");
   const location = useLocation();
+  const [storedNotice] = useState(() => {
+    const value = sessionStorage.getItem("vishwaneed.vendor.auth.notice") ?? "";
+    sessionStorage.removeItem("vishwaneed.vendor.auth.notice");
+    return value;
+  });
+  const notice =
+    (location.state as { notice?: string } | null)?.notice ?? storedNotice;
   const navigate = useNavigate();
   const {
     register,
@@ -49,12 +63,133 @@ export function LoginPage() {
           />
         </Field>
         {error && <p className="form-error">{error}</p>}
+        {notice && <p className="form-success" role="status">{notice}</p>}
         <button className="primary" disabled={isSubmitting}>
           {isSubmitting ? "Signing in…" : "Sign in securely"}
         </button>
         <p className="auth-switch">
+          <Link to="/forgot-password">Forgot password?</Link>
+          <br />
           New vendor? <Link to="/register">Create a vendor account</Link>
         </p>
+      </form>
+    </AuthFrame>
+  );
+}
+
+const passwordSchema = z
+  .string()
+  .min(10, "Use at least 10 characters")
+  .regex(/[A-Z]/, "Include an uppercase letter")
+  .regex(/[0-9]/, "Include a number");
+
+const forgotSchema = z.object({
+  identifier: z.string().min(3, "Enter your registered email or mobile number"),
+});
+type ForgotPassword = z.infer<typeof forgotSchema>;
+
+export function ForgotPasswordPage() {
+  const [result, setResult] = useState<{
+    message: string;
+    developmentResetUrl?: string;
+  } | null>(null);
+  const [error, setError] = useState("");
+  const form = useForm<ForgotPassword>({ resolver: zodResolver(forgotSchema) });
+  return (
+    <AuthFrame
+      title="Reset vendor password"
+      subtitle="Enter your registered vendor email or mobile number. Reset instructions are sent securely without revealing whether an account exists."
+    >
+      {result ? (
+        <div className="password-result" role="status">
+          <h3>Request received</h3>
+          <p>{result.message}</p>
+          {result.developmentResetUrl && (
+            <a className="primary" href={result.developmentResetUrl}>
+              Open development reset link
+            </a>
+          )}
+          <Link className="secondary" to="/login">
+            Return to sign in
+          </Link>
+        </div>
+      ) : (
+        <form
+          onSubmit={(event) =>
+            void form.handleSubmit(async ({ identifier }) => {
+              try {
+                setError("");
+                setResult(
+                  await api.post("/auth/forgot-password", {
+                    emailOrMobile: identifier,
+                  }),
+                );
+              } catch (caught) {
+                setError(caught instanceof Error ? caught.message : "Request failed");
+              }
+            })(event)
+          }
+        >
+          <Field label="Email or mobile" error={form.formState.errors.identifier?.message}>
+            <input autoComplete="username" {...form.register("identifier")} />
+          </Field>
+          {error && <p className="form-error" role="alert">{error}</p>}
+          <button className="primary" disabled={form.formState.isSubmitting}>
+            {form.formState.isSubmitting ? "Sending…" : "Send reset instructions"}
+          </button>
+          <p className="auth-switch"><Link to="/login">Return to sign in</Link></p>
+        </form>
+      )}
+    </AuthFrame>
+  );
+}
+
+const resetSchema = z
+  .object({ password: passwordSchema, confirmPassword: z.string() })
+  .refine((values) => values.password === values.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
+type ResetPassword = z.infer<typeof resetSchema>;
+
+export function ResetPasswordPage() {
+  const [params] = useSearchParams();
+  const token = params.get("token") ?? "";
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+  const form = useForm<ResetPassword>({ resolver: zodResolver(resetSchema) });
+  return (
+    <AuthFrame
+      title="Choose a new vendor password"
+      subtitle="Use at least 10 characters with an uppercase letter and a number."
+    >
+      <form
+        onSubmit={(event) =>
+          void form.handleSubmit(async ({ password }) => {
+            try {
+              setError("");
+              await api.post("/auth/reset-password", { token, password });
+              void navigate("/login", {
+                replace: true,
+                state: { notice: "Password reset successfully. Please sign in." },
+              });
+            } catch (caught) {
+              setError(caught instanceof Error ? caught.message : "Password reset failed");
+            }
+          })(event)
+        }
+      >
+        <Field label="New password" error={form.formState.errors.password?.message}>
+          <input type="password" autoComplete="new-password" {...form.register("password")} />
+        </Field>
+        <Field label="Confirm new password" error={form.formState.errors.confirmPassword?.message}>
+          <input type="password" autoComplete="new-password" {...form.register("confirmPassword")} />
+        </Field>
+        {!token && <p className="form-error" role="alert">The reset token is missing.</p>}
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <button className="primary" disabled={!token || form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? "Updating…" : "Update password"}
+        </button>
       </form>
     </AuthFrame>
   );
@@ -87,6 +222,7 @@ export function RegisterPage() {
           try {
             await registerVendor({
               email: v.email,
+              mobile: v.mobile,
               password: v.password,
               businessName: v.businessName,
               ownerName: v.ownerName,
@@ -140,7 +276,7 @@ export function RegisterPage() {
     </AuthFrame>
   );
 }
-function AuthFrame({
+export function AuthFrame({
   title,
   subtitle,
   children,

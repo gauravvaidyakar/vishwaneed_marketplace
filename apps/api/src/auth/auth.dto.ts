@@ -59,3 +59,17 @@ export class ResetPasswordDto {
   @Matches(/[0-9]/, { message: "Password must include a number" })
   password!: string;
 }
+
+export class ChangeVendorPasswordDto {
+  @IsString() @IsNotEmpty() currentPassword!: string;
+
+  @IsString()
+  @MinLength(10)
+  @Matches(/[A-Z]/, {
+    message: "New password must include an uppercase letter",
+  })
+  @Matches(/[0-9]/, { message: "New password must include a number" })
+  newPassword!: string;
+
+  @IsString() @IsNotEmpty() confirmNewPassword!: string;
+}

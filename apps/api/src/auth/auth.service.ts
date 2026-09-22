@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Optional,
   UnauthorizedException,
@@ -14,6 +15,7 @@ import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import type {
   ForgotPasswordDto,
+  ChangeVendorPasswordDto,
   LoginDto,
   RefreshDto,
   RegisterDto,
@@ -178,11 +180,11 @@ export class AuthService {
       }),
     ]);
 
-    const customerWebUrl = this.config.get<string>(
-      "CUSTOMER_WEB_URL",
-      "http://localhost:5173",
-    );
-    const resetUrl = `${customerWebUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
+    const resetBaseUrl =
+      user.role === Role.VENDOR
+        ? this.config.get<string>("VENDOR_WEB_URL", "http://localhost:5174")
+        : this.config.get<string>("CUSTOMER_WEB_URL", "http://localhost:5173");
+    const resetUrl = `${resetBaseUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`;
     await this.notifications?.sendWhatsApp(user.id, "password_reset", {
       resetUrl,
       expiresInMinutes: ttlMinutes,
@@ -218,6 +220,43 @@ export class AuthService {
       }),
     ]);
     return { message: "Password updated successfully" };
+  }
+
+  async changeVendorPassword(
+    userId: string,
+    input: ChangeVendorPasswordDto,
+  ): Promise<{ message: string; requiresReauthentication: true }> {
+    if (input.newPassword !== input.confirmNewPassword) {
+      throw new BadRequestException("New password confirmation does not match");
+    }
+    if (input.currentPassword === input.newPassword) {
+      throw new BadRequestException(
+        "New password must be different from the current password",
+      );
+    }
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.role !== Role.VENDOR) {
+      throw new ForbiddenException("Vendor account access is required");
+    }
+    if (!(await compare(input.currentPassword, user.passwordHash))) {
+      throw new UnauthorizedException("Current password is incorrect");
+    }
+
+    const passwordHash = await hash(input.newPassword, 12);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash, refreshTokenHash: null },
+      }),
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+    return {
+      message: "Password changed successfully. Please sign in again.",
+      requiresReauthentication: true,
+    };
   }
 
   private async createSession(user: User): Promise<Record<string, unknown>> {

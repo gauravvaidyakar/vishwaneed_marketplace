@@ -7,11 +7,15 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { Role } from "@prisma/client";
 import { CurrentUser } from "../common/current-user.decorator";
 import type { RequestUser } from "../common/request-user";
+import { Roles } from "../common/roles.decorator";
+import { RolesGuard } from "../common/roles.guard";
 import { AuthService } from "./auth.service";
 import {
   ForgotPasswordDto,
+  ChangeVendorPasswordDto,
   LoginDto,
   RefreshDto,
   RegisterDto,
@@ -52,6 +56,18 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   resetPassword(@Body() input: ResetPasswordDto) {
     return this.auth.resetPassword(input);
+  }
+  @Post("vendor/change-password")
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.VENDOR)
+  changeVendorPassword(
+    @CurrentUser() user: RequestUser,
+    @Body() input: ChangeVendorPasswordDto,
+  ) {
+    return this.auth.changeVendorPassword(user.id, input);
   }
   @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)

@@ -2,6 +2,7 @@ type Environment = Record<string, string | undefined>;
 
 export function validateEnvironment(input: Environment): Environment {
   const environment = input.NODE_ENV ?? "development";
+  const customerWebUrl = input.CUSTOMER_WEB_URL ?? "http://localhost:5173";
   const required = [
     "DATABASE_URL",
     "JWT_ACCESS_SECRET",
@@ -42,7 +43,12 @@ export function validateEnvironment(input: Environment): Environment {
     RETURN_WINDOW_DAYS: input.RETURN_WINDOW_DAYS ?? "7",
     CHECKOUT_QUOTE_TTL_MINUTES: input.CHECKOUT_QUOTE_TTL_MINUTES ?? "10",
     PASSWORD_RESET_TTL_MINUTES: input.PASSWORD_RESET_TTL_MINUTES ?? "30",
-    CUSTOMER_WEB_URL: input.CUSTOMER_WEB_URL ?? "http://localhost:5173",
+    CUSTOMER_WEB_URL: customerWebUrl,
+    VENDOR_WEB_URL:
+      input.VENDOR_WEB_URL ??
+      (environment === "production"
+        ? `${customerWebUrl.replace(/\/$/, "")}/vendor`
+        : "http://localhost:5174"),
     SHIPPING_PROVIDER:
       input.SHIPPING_PROVIDER ??
       (environment === "production" ? "SHIPROCKET" : "DEVELOPMENT"),

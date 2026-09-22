@@ -9,6 +9,7 @@ import {
   VendorSuspensionReason,
 } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
+import { compare, hash } from "bcryptjs";
 import { AdminService } from "../src/admin/admin.service";
 import { AuthService } from "../src/auth/auth.service";
 import { validateEnvironment } from "../src/config/environment";
@@ -91,6 +92,105 @@ describe("platform security rules", () => {
     await expect(
       service.resetPassword({ token: "expired", password: "StrongPass1" }),
     ).rejects.toThrow("invalid or has expired");
+  });
+
+  it("changes a vendor password securely and revokes refresh/reset sessions", async () => {
+    const update = vi.fn().mockResolvedValue({ id: "vendor-user" });
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "vendor-user",
+          role: Role.VENDOR,
+          passwordHash: await hash("CurrentPass1", 12),
+        }),
+        update,
+      },
+      passwordResetToken: { updateMany },
+      $transaction: vi.fn((operations: Promise<unknown>[]) =>
+        Promise.all(operations),
+      ),
+    } as unknown as PrismaService;
+    const service = new AuthService(
+      prisma,
+      {} as JwtService,
+      {} as ConfigService,
+    );
+
+    await expect(
+      service.changeVendorPassword("vendor-user", {
+        currentPassword: "CurrentPass1",
+        newPassword: "NewVendorPass2",
+        confirmNewPassword: "NewVendorPass2",
+      }),
+    ).resolves.toEqual({
+      message: "Password changed successfully. Please sign in again.",
+      requiresReauthentication: true,
+    });
+
+    const [updateInput] = update.mock.calls[0] as unknown as [
+      { data: { passwordHash: string; refreshTokenHash: null } },
+    ];
+    expect(await compare("NewVendorPass2", updateInput.data.passwordHash)).toBe(
+      true,
+    );
+    expect(updateInput.data.refreshTokenHash).toBeNull();
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: "vendor-user", usedAt: null } }),
+    );
+  });
+
+  it("rejects a vendor password change when the current password is wrong", async () => {
+    const update = vi.fn();
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "vendor-user",
+          role: Role.VENDOR,
+          passwordHash: await hash("CurrentPass1", 12),
+        }),
+        update,
+      },
+    } as unknown as PrismaService;
+    const service = new AuthService(
+      prisma,
+      {} as JwtService,
+      {} as ConfigService,
+    );
+
+    await expect(
+      service.changeVendorPassword("vendor-user", {
+        currentPassword: "WrongPass1",
+        newPassword: "NewVendorPass2",
+        confirmNewPassword: "NewVendorPass2",
+      }),
+    ).rejects.toThrow("Current password is incorrect");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("does not allow a non-vendor to use vendor password management", async () => {
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "customer-user",
+          role: Role.CUSTOMER,
+          passwordHash: "unused",
+        }),
+      },
+    } as unknown as PrismaService;
+    const service = new AuthService(
+      prisma,
+      {} as JwtService,
+      {} as ConfigService,
+    );
+
+    await expect(
+      service.changeVendorPassword("customer-user", {
+        currentPassword: "CurrentPass1",
+        newPassword: "NewVendorPass2",
+        confirmNewPassword: "NewVendorPass2",
+      }),
+    ).rejects.toThrow("Vendor account access is required");
   });
 
   it("requires independent strong JWT secrets and field encryption", () => {

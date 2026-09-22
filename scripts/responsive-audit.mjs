@@ -73,6 +73,8 @@ const panels = [
     routes: [
       "/login",
       "/register",
+      "/forgot-password",
+      "/reset-password?token=responsive-reset-token",
       "/",
       "/dashboard",
       "/profile",

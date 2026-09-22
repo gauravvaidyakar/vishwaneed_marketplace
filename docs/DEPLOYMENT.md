@@ -13,6 +13,8 @@ During initial Blueprint creation, provide:
 
 - `CORS_ORIGINS`: the single public marketplace origin
 - `CUSTOMER_WEB_URL`: the single public marketplace origin
+- `VENDOR_WEB_URL`: optional Vendor Panel origin used in password-reset links;
+  defaults to `<CUSTOMER_WEB_URL>/vendor` in production
 - `ADMIN_EMAIL`: initial production administrator email
 - `ADMIN_PASSWORD`: strong unique password (minimum 12 characters)
 

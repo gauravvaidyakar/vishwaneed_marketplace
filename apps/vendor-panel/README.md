@@ -22,6 +22,7 @@ The API must allow `http://localhost:5174` in `CORS_ORIGINS`.
 
 - Product media accepts the existing API's image URL array; binary product-image upload is not exposed by the API.
 - Notifications can be listed but the database/API has no read/unread field or mutation.
-- Password reset/change endpoints are not present.
+- Password management uses the backend-authenticated vendor change-password
+  endpoint and the shared expiring, single-use forgot/reset-token flow.
 - Return/replacement decisions remain admin-controlled by the current API; the vendor can inspect them but cannot mutate them.
 - Shiprocket and WhatsApp behavior depends on provider credentials and adapters configured in the API environment.
