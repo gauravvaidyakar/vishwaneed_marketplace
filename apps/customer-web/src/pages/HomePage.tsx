@@ -57,7 +57,7 @@ export function HomePage() {
       <section className="promo-section"><div className="shell promo-grid"><div><span className="eyebrow eyebrow--light">Millet goodness</span><h2>Everyday staples, grown with care.</h2><p>Build a better pantry with unpolished grains, stone-ground flours and mindful snacks.</p><Link className="button button--light" to="/products?category=millets">Explore millets <ArrowRight size={18} /></Link></div><div className="promo-stat"><strong>GST-inclusive</strong><span>Product prices are shown clearly, without adding tax twice.</span></div></div></section>
 
       <section className="section shell" aria-labelledby="vendors-heading">
-        <div className="section-heading"><div><span className="eyebrow">Trusted producers</span><h2 id="vendors-heading">Featured vendors</h2></div></div>
+        <div className="section-heading"><div><span className="eyebrow">Trusted producers</span><h2 id="vendors-heading">Featured products</h2></div></div>
         {(featured.isLoading || bestSellers.isLoading) && <LoadingState label="Loading approved vendors" />}
         {(featured.isError || bestSellers.isError) && <ErrorState message="Approved vendors are unavailable." onRetry={() => { void featured.refetch(); void bestSellers.refetch(); }} />}
         {featuredVendors.length > 0 && <div className="vendor-grid">{featuredVendors.map((vendor) => <article className="vendor-card" key={vendor.id}><div className="vendor-avatar">{vendor.name.charAt(0)}</div><div><h3>{vendor.name}</h3><p>{vendor.location}</p><span>{vendor.productCount} approved {vendor.productCount === 1 ? 'product' : 'products'}</span></div></article>)}</div>}
