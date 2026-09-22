@@ -145,18 +145,19 @@ h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.12; }
 .vendor-card p { display: flex; align-items: center; gap: 3px; }
 .vendor-card .vendor-rating { color: #c47c00; font-weight: 700; }
 
-.page-transition { position: relative; min-height: 1px; overflow: clip; }
-.page-transition.is-changing { overflow: hidden; }
-.page-transition__view { width: 100%; }
-.page-transition__view--incoming { position: absolute; inset: 0 auto auto 0; z-index: 2; background: var(--cream); }
-.page-transition.is-forward .page-transition__view--outgoing { animation: page-slide-out-left 380ms ease-in-out both; }
-.page-transition.is-forward .page-transition__view--incoming { animation: page-slide-in-right 380ms ease-in-out both; }
-.page-transition.is-back .page-transition__view--outgoing { animation: page-slide-out-right 380ms ease-in-out both; }
-.page-transition.is-back .page-transition__view--incoming { animation: page-slide-in-left 380ms ease-in-out both; }
-@keyframes page-slide-out-left { to { opacity: .35; transform: translateX(-5%); } }
-@keyframes page-slide-in-right { from { opacity: .35; transform: translateX(5%); } }
-@keyframes page-slide-out-right { to { opacity: .35; transform: translateX(5%); } }
-@keyframes page-slide-in-left { from { opacity: .35; transform: translateX(-5%); } }
+.page-transition { position: relative; min-height: 1px; overflow: clip; background: var(--cream); contain: paint; }
+.page-transition.is-changing { overflow: hidden; pointer-events: none; }
+.page-transition__view { width: 100%; background: var(--cream); backface-visibility: hidden; transform: translateZ(0); }
+.page-transition__view--outgoing { position: relative; z-index: 1; will-change: transform, opacity; }
+.page-transition__view--incoming { position: absolute; inset: 0 auto auto 0; z-index: 2; min-height: 100%; will-change: transform, opacity; }
+.page-transition.is-forward .page-transition__view--outgoing { animation: page-slide-out-left 480ms cubic-bezier(.65, 0, .35, 1) both; }
+.page-transition.is-forward .page-transition__view--incoming { animation: page-slide-in-right 480ms cubic-bezier(.65, 0, .35, 1) both; }
+.page-transition.is-back .page-transition__view--outgoing { animation: page-slide-out-right 480ms cubic-bezier(.65, 0, .35, 1) both; }
+.page-transition.is-back .page-transition__view--incoming { animation: page-slide-in-left 480ms cubic-bezier(.65, 0, .35, 1) both; }
+@keyframes page-slide-out-left { from { opacity: 1; transform: translate3d(0, 0, 0); } to { opacity: .58; transform: translate3d(-100%, 0, 0); } }
+@keyframes page-slide-in-right { from { opacity: .72; transform: translate3d(100%, 0, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes page-slide-out-right { from { opacity: 1; transform: translate3d(0, 0, 0); } to { opacity: .58; transform: translate3d(100%, 0, 0); } }
+@keyframes page-slide-in-left { from { opacity: .72; transform: translate3d(-100%, 0, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
 
 .product-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
 .product-grid--compact { grid-template-columns: repeat(4, 1fr); }

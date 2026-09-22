@@ -5,6 +5,8 @@ interface TransitionFrame {
   content: ReactNode;
 }
 
+const TRANSITION_DURATION_MS = 480;
+
 export function PageTransition({ children, transitionKey, direction }: { children: ReactNode; transitionKey: string; direction: 'forward' | 'back' }) {
   const [current, setCurrent] = useState<TransitionFrame>({ key: transitionKey, content: children });
   const [incoming, setIncoming] = useState<TransitionFrame | null>(null);
@@ -21,7 +23,7 @@ export function PageTransition({ children, transitionKey, direction }: { childre
       setCurrent(next);
       setIncoming(null);
       timer.current = null;
-    }, 380);
+    }, TRANSITION_DURATION_MS);
   }, [current.key, transitionKey]);
 
   useEffect(() => () => {
