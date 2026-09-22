@@ -152,6 +152,15 @@ export function createMockMarketplaceApi(): MarketplaceApi {
     async resetPassword() {
       await wait();
     },
+    async requestVerificationOtp() {
+      await wait();
+      return { message: "Verification code sent securely", developmentOtp: "123456" };
+    },
+    async verifyOtp(code: string) {
+      await wait();
+      if (code !== "123456") throw new ApiError("Verification code is invalid or expired", 400, "INVALID_OTP");
+      return { message: "Mobile number verified successfully", verified: true };
+    },
     async getCart() {
       await wait();
       return buildCart();
@@ -316,6 +325,12 @@ export function createMockMarketplaceApi(): MarketplaceApi {
     async createReview(productId, input) {
       await wait();
       return mockPostPurchase.createReview(productId, input);
+    },
+    updateReview(reviewId, input) {
+      return Promise.resolve(mockPostPurchase.updateReview(reviewId, input));
+    },
+    reportReview() {
+      return Promise.resolve({ reported: true, referenceNumber: `CMP-${Date.now()}-REVIEW` });
     },
     async getComplaints() {
       await wait();

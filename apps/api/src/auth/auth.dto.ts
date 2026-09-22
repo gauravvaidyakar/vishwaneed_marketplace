@@ -73,3 +73,9 @@ export class ChangeVendorPasswordDto {
 
   @IsString() @IsNotEmpty() confirmNewPassword!: string;
 }
+
+export class VerifyOtpDto {
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "OTP must contain exactly 6 digits" })
+  code!: string;
+}

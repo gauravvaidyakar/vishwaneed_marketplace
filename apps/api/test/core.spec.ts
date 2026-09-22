@@ -193,6 +193,51 @@ describe("platform security rules", () => {
     ).rejects.toThrow("Vendor account access is required");
   });
 
+  it("verifies a one-time code and consumes it while marking the mobile verified", async () => {
+    const consumed = vi.fn().mockResolvedValue({});
+    const verifyUser = vi.fn().mockResolvedValue({});
+    const prisma = {
+      verificationOtp: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "otp-id",
+          codeHash: await hash("123456", 12),
+          expiresAt: new Date(Date.now() + 60_000),
+          attempts: 0,
+        }),
+        update: consumed,
+      },
+      user: { update: verifyUser },
+      $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
+    } as unknown as PrismaService;
+    const service = new AuthService(prisma, {} as JwtService, {} as ConfigService);
+
+    await expect(service.verifyOtp("user-id", { code: "123456" })).resolves.toEqual({
+      message: "Mobile number verified successfully",
+      verified: true,
+    });
+    expect(consumed).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "otp-id" } }));
+    expect(verifyUser).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "user-id" } }));
+  });
+
+  it("counts an invalid one-time-code attempt without exposing the expected code", async () => {
+    const update = vi.fn().mockResolvedValue({});
+    const prisma = {
+      verificationOtp: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "otp-id",
+          codeHash: await hash("123456", 12),
+          expiresAt: new Date(Date.now() + 60_000),
+          attempts: 0,
+        }),
+        update,
+      },
+    } as unknown as PrismaService;
+    const service = new AuthService(prisma, {} as JwtService, {} as ConfigService);
+
+    await expect(service.verifyOtp("user-id", { code: "654321" })).rejects.toThrow("invalid or expired");
+    expect(update).toHaveBeenCalledWith({ where: { id: "otp-id" }, data: { attempts: { increment: 1 } } });
+  });
+
   it("requires independent strong JWT secrets and field encryption", () => {
     expect(() =>
       validateEnvironment({

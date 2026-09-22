@@ -20,6 +20,7 @@ import {
   RefreshDto,
   RegisterDto,
   ResetPasswordDto,
+  VerifyOtpDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import { Throttle } from "@nestjs/throttler";
@@ -56,6 +57,24 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   resetPassword(@Body() input: ResetPasswordDto) {
     return this.auth.resetPassword(input);
+  }
+  @Post("request-verification-otp")
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.CUSTOMER, Role.VENDOR)
+  requestVerificationOtp(@CurrentUser() user: RequestUser) {
+    return this.auth.requestVerificationOtp(user.id);
+  }
+  @Post("verify-otp")
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.CUSTOMER, Role.VENDOR)
+  verifyOtp(@CurrentUser() user: RequestUser, @Body() input: VerifyOtpDto) {
+    return this.auth.verifyOtp(user.id, input);
   }
   @Post("vendor/change-password")
   @HttpCode(HttpStatus.OK)

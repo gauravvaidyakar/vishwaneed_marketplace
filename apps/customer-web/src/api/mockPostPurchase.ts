@@ -219,11 +219,19 @@ export const mockPostPurchase = {
     const orders = getOrdersStore();
     const orderItem = orders.flatMap((order) => order.vendorOrders).flatMap((vendorOrder) => vendorOrder.items).find((candidate) => candidate.id === input.orderItemId && candidate.productId === productId);
     if (!orderItem || !orderItem.actions.canReview) throw new ApiError('This purchase is not eligible for review.', 409, 'REVIEW_NOT_ELIGIBLE');
-    const review: Review = { id: crypto.randomUUID(), productId, orderItemId: input.orderItemId, rating: input.rating, comment: input.comment, status: 'PENDING_MODERATION', submittedAt: now() };
+    const review: Review = { id: crypto.randomUUID(), productId, orderItemId: input.orderItemId, rating: input.rating, comment: input.comment, images: input.imageUrls ?? [], status: 'PENDING_MODERATION', submittedAt: now() };
     orderItem.review = review;
     orderItem.actions.canReview = false;
     saveOrders(orders);
     return review;
+  },
+  updateReview(reviewId: string, input: Omit<CreateReviewInput, 'orderItemId'>): Review {
+    const orders = getOrdersStore();
+    const item = orders.flatMap((order) => order.vendorOrders).flatMap((vendorOrder) => vendorOrder.items).find((candidate) => candidate.review?.id === reviewId);
+    if (!item?.review) throw new ApiError('Review not found.', 404, 'REVIEW_NOT_FOUND');
+    item.review = { ...item.review, rating: input.rating, comment: input.comment, images: input.imageUrls ?? [], status: 'PENDING_MODERATION' };
+    saveOrders(orders);
+    return item.review;
   },
   getComplaints(): Complaint[] {
     return readJson(COMPLAINTS_KEY, seededComplaints);

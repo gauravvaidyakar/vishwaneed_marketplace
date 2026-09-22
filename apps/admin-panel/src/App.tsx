@@ -254,10 +254,20 @@ function Login() {
 interface Dashboard {
   customers: number;
   vendors: number;
+  activeVendors: number;
   pendingVendors: number;
   products: number;
   pendingProducts: number;
   orders: number;
+  vendorOrders: number;
+  sales: string | number;
+  commission: string | number;
+  revenue: string | number;
+  settlements: string | number;
+  refunds: string | number;
+  complaints: number;
+  reviews: number;
+  inventory: number;
 }
 function DashboardPage() {
   const q = useQuery({

@@ -43,6 +43,7 @@ export function validateEnvironment(input: Environment): Environment {
     RETURN_WINDOW_DAYS: input.RETURN_WINDOW_DAYS ?? "7",
     CHECKOUT_QUOTE_TTL_MINUTES: input.CHECKOUT_QUOTE_TTL_MINUTES ?? "10",
     PASSWORD_RESET_TTL_MINUTES: input.PASSWORD_RESET_TTL_MINUTES ?? "30",
+    OTP_TTL_MINUTES: input.OTP_TTL_MINUTES ?? "10",
     CUSTOMER_WEB_URL: customerWebUrl,
     VENDOR_WEB_URL:
       input.VENDOR_WEB_URL ??

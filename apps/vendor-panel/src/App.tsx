@@ -16,7 +16,7 @@ import { OrdersPage } from "./pages/OrdersPage";
 import { OperationsPage } from "./pages/OperationsPage";
 import { FinancePage } from "./pages/FinancePage";
 import { SupportPage } from "./pages/SupportPage";
-import { NotificationsPage, SettingsPage } from "./pages/SimplePages";
+import { NotificationsPage, SettingsPage, VerifyMobilePage } from "./pages/SimplePages";
 const client = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 20_000 } },
 });
@@ -42,6 +42,7 @@ export function App() {
             <Route index element={<DashboardPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="verify-mobile" element={<VerifyMobilePage />} />
             <Route path="products" element={<ProductsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="orders" element={<OrdersPage />} />

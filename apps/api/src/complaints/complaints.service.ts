@@ -11,6 +11,7 @@ import { extname, resolve, sep } from "node:path";
 import { PrismaService } from "../database/prisma.service";
 import type { CreateComplaintDto } from "./complaints.dto";
 import { VendorsService } from "../vendors/vendors.service";
+import { NotificationsService } from "../notifications/notifications.service";
 
 const ATTACHMENT_MIME = new Map([
   ["image/jpeg", ".jpg"],
@@ -32,6 +33,7 @@ export class ComplaintsService {
     private readonly prisma: PrismaService,
     private readonly vendors: VendorsService,
     private readonly config: ConfigService,
+    private readonly notifications: NotificationsService,
   ) {}
   async create(
     userId: string,
@@ -92,6 +94,7 @@ export class ComplaintsService {
       },
       include: CUSTOMER_COMPLAINT_INCLUDE,
     });
+    void this.notifications.notifyComplaintStatus(complaint.id, "CREATED");
     return this.presentCustomerComplaint(complaint);
   }
 
@@ -154,7 +157,7 @@ export class ComplaintsService {
   }
   async message(userId: string, id: string, message: string) {
     await this.get(userId, id);
-    await this.prisma.complaintMessage.create({
+    const createdMessage = await this.prisma.complaintMessage.create({
       data: {
         complaintId: id,
         authorId: userId,
@@ -162,6 +165,7 @@ export class ComplaintsService {
         message,
       },
     });
+    void this.notifications.notifyComplaintStatus(id, `CUSTOMER_MESSAGE_${createdMessage.id}`);
     return this.get(userId, id);
   }
 
@@ -191,16 +195,17 @@ export class ComplaintsService {
     } else {
       await this.prisma.complaint.findUniqueOrThrow({ where: { id } });
     }
-    await this.prisma.complaintMessage.create({
+    const createdMessage = await this.prisma.complaintMessage.create({
       data: { complaintId: id, authorId: userId, authorRole: role, message },
     });
+    void this.notifications.notifyComplaintStatus(id, `${role}_MESSAGE_${createdMessage.id}`);
     return this.prisma.complaint.findUniqueOrThrow({
       where: { id },
       include: { messages: { orderBy: { createdAt: "asc" } } },
     });
   }
 
-  updateStatus(id: string, status: ComplaintStatus, resolution?: string) {
+  async updateStatus(id: string, status: ComplaintStatus, resolution?: string) {
     if (
       (status === ComplaintStatus.RESOLVED ||
         status === ComplaintStatus.CLOSED) &&
@@ -208,10 +213,12 @@ export class ComplaintsService {
     ) {
       throw new BadRequestException("A resolution is required");
     }
-    return this.prisma.complaint.update({
+    const complaint = await this.prisma.complaint.update({
       where: { id },
       data: { status, ...(resolution ? { resolution } : {}) },
     });
+    void this.notifications.notifyComplaintStatus(id, `STATUS_${status}`);
+    return complaint;
   }
 
   private presentCustomerComplaint(complaint: CustomerComplaint) {

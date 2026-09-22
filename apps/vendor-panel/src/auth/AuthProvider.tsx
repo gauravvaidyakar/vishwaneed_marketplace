@@ -13,6 +13,7 @@ interface AuthValue {
   login: (identifier: string, password: string) => Promise<void>;
   register: (input: Record<string, unknown>) => Promise<void>;
   logout: () => Promise<void>;
+  updateUser: (user: Session["user"]) => void;
 }
 const Context = createContext<AuthValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -54,6 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           sessionStore.clear();
           setSession(null);
         }
+      },
+      updateUser: (user) => {
+        setSession((current) => {
+          if (!current) return current;
+          const next = { ...current, user };
+          sessionStore.set(next);
+          return next;
+        });
       },
     }),
     [session, accept],

@@ -7,7 +7,7 @@ export interface ApiEnvelope<T> {
 export interface Session {
   accessToken: string;
   refreshToken: string;
-  user: { id: string; email?: string; mobile?: string; role: string };
+  user: { id: string; email?: string; mobile?: string; role: string; mobileVerified?: boolean };
 }
 const KEY = "vishwaneed.vendor.session";
 export const sessionStore = {

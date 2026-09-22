@@ -252,6 +252,15 @@ export class ProductsService {
               products: { where: { status: ProductStatus.APPROVED } },
             },
           },
+          products: {
+            where: { status: ProductStatus.APPROVED },
+            select: {
+              reviews: {
+                where: { status: "PUBLISHED" as const },
+                select: { rating: true },
+              },
+            },
+          },
         },
       },
       images: { orderBy: { sortOrder: "asc" as const } },
@@ -273,6 +282,13 @@ export class ProductsService {
     const rating = ratings.length
       ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length
       : 0;
+    const vendorRatings = product.vendor.products.flatMap((vendorProduct) =>
+      vendorProduct.reviews.map((review) => review.rating),
+    );
+    const vendorRating = vendorRatings.length
+      ? vendorRatings.reduce((sum, value) => sum + value, 0) /
+        vendorRatings.length
+      : 0;
     return {
       id: product.id,
       slug: product.slug,
@@ -284,7 +300,7 @@ export class ProductsService {
         id: product.vendor.id,
         name: product.vendor.businessName,
         location: product.vendor.pickupPincode ?? "",
-        rating: 0,
+        rating: vendorRating,
         productCount: product.vendor._count.products,
       },
       price: { amount: product.price.toNumber(), currency: "INR" },

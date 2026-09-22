@@ -22,13 +22,23 @@ export class AdminService {
     const [
       customers,
       vendors,
+      activeVendors,
       pendingVendors,
       products,
       pendingProducts,
       orders,
+      vendorOrders,
+      sales,
+      commission,
+      settlements,
+      refunds,
+      complaints,
+      reviews,
+      inventory,
     ] = await this.prisma.$transaction([
       this.prisma.customerProfile.count(),
       this.prisma.vendor.count(),
+      this.prisma.vendor.count({ where: { status: VendorStatus.APPROVED } }),
       this.prisma.vendor.count({
         where: {
           status: {
@@ -45,14 +55,32 @@ export class AdminService {
         where: { status: ProductStatus.PENDING_APPROVAL },
       }),
       this.prisma.masterOrder.count(),
+      this.prisma.vendorOrder.count(),
+      this.prisma.masterOrder.aggregate({ _sum: { payableTotal: true } }),
+      this.prisma.commissionTransaction.aggregate({ _sum: { amount: true } }),
+      this.prisma.settlement.aggregate({ _sum: { amount: true } }),
+      this.prisma.refund.aggregate({ _sum: { amount: true } }),
+      this.prisma.complaint.count(),
+      this.prisma.review.count(),
+      this.prisma.inventory.count(),
     ]);
     return {
       customers,
       vendors,
+      activeVendors,
       pendingVendors,
       products,
       pendingProducts,
       orders,
+      vendorOrders,
+      sales: sales._sum.payableTotal ?? 0,
+      commission: commission._sum.amount ?? 0,
+      revenue: commission._sum.amount ?? 0,
+      settlements: settlements._sum.amount ?? 0,
+      refunds: refunds._sum.amount ?? 0,
+      complaints,
+      reviews,
+      inventory,
     };
   }
   async listVendors(page: number, limit: number) {

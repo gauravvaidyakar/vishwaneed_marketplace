@@ -241,8 +241,22 @@ model User {
   auditLogs                  AuditLog[]           @relation("AuditActor")
   integrationSettingsUpdated IntegrationSetting[] @relation("IntegrationSettingUpdater")
   passwordResetTokens        PasswordResetToken[]
+  verificationOtps           VerificationOtp[]
 
   @@index([role, status])
+}
+
+model VerificationOtp {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }
 
 model PasswordResetToken {

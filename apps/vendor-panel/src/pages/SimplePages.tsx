@@ -1,6 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bell, KeyRound, Shield } from "lucide-react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -52,6 +53,66 @@ export function NotificationsPage() {
           ))}
         </div>
       </AsyncState>
+    </>
+  );
+}
+
+interface VerificationResult {
+  verified: boolean;
+  expiresInMinutes?: number;
+  developmentOtp?: string;
+}
+
+export function VerifyMobilePage() {
+  const navigate = useNavigate();
+  const { session, updateUser } = useAuth();
+  const [code, setCode] = useState("");
+  const [sent, setSent] = useState(false);
+  const [developmentOtp, setDevelopmentOtp] = useState("");
+  const requestOtp = useMutation({
+    mutationFn: () => api.post<VerificationResult>("/auth/request-verification-otp"),
+    onSuccess: (result) => {
+      if (result.verified && session) {
+        updateUser({ ...session.user, mobileVerified: true });
+        void navigate("/profile", { replace: true });
+        return;
+      }
+      setDevelopmentOtp(result.developmentOtp ?? "");
+      setSent(true);
+    },
+  });
+  const verifyOtp = useMutation({
+    mutationFn: () => api.post<VerificationResult>("/auth/verify-otp", { code }),
+    onSuccess: () => {
+      if (session) updateUser({ ...session.user, mobileVerified: true });
+      void navigate("/profile", { replace: true });
+    },
+  });
+  const error = requestOtp.error ?? verifyOtp.error;
+  const busy = requestOtp.isPending || verifyOtp.isPending;
+  return (
+    <>
+      <PageHead eyebrow="Account verification" title="Verify mobile number" subtitle="Confirm your business mobile for account and order notifications." />
+      <section className="card security-form">
+        <Shield />
+        <div>
+          <h2>One-time verification code</h2>
+          <p>The code is delivered to the mobile number registered with your vendor account.</p>
+          {!sent ? (
+            <button className="primary" type="button" disabled={busy} onClick={() => requestOtp.mutate()}>{busy ? "Sending…" : "Send verification code"}</button>
+          ) : (
+            <form onSubmit={(event) => { event.preventDefault(); if (/^\d{6}$/.test(code)) verifyOtp.mutate(); }}>
+              <Field label="6-digit verification code">
+                <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))} />
+              </Field>
+              {developmentOtp && <p className="success">Development code: {developmentOtp}</p>}
+              <button className="primary" disabled={busy || !/^\d{6}$/.test(code)}>{busy ? "Verifying…" : "Verify mobile"}</button>
+              <button className="secondary" type="button" disabled={busy} onClick={() => requestOtp.mutate()}>Send a new code</button>
+            </form>
+          )}
+          {error && <p className="form-error" role="alert">{error instanceof Error ? error.message : "Verification failed"}</p>}
+        </div>
+      </section>
     </>
   );
 }

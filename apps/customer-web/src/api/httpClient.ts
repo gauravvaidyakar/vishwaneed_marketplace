@@ -27,6 +27,10 @@ export class HttpClient {
     return this.request<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
   }
 
+  patchForm<T>(path: string, body: FormData): Promise<T> {
+    return this.request<T>(path, { method: 'PATCH', body });
+  }
+
   delete<T>(path: string): Promise<T> {
     return this.request<T>(path, { method: 'DELETE' });
   }

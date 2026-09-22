@@ -44,3 +44,11 @@ export function useCreateReview(orderId: string) {
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: orderKeys.detail(orderId) }); },
   });
 }
+
+export function useUpdateReview(orderId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reviewId, input }: { reviewId: string; input: Omit<CreateReviewInput, 'orderItemId'> }) => marketplaceApi.updateReview(reviewId, input),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: orderKeys.detail(orderId) }); },
+  });
+}

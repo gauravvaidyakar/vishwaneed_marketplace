@@ -233,7 +233,7 @@ export function RegisterPage() {
                 pincode: v.pincode,
               },
             });
-            void navigate("/profile");
+            void navigate("/verify-mobile");
           } catch (e) {
             setError(e instanceof Error ? e.message : "Registration failed");
           }

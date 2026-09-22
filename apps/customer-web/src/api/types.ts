@@ -78,6 +78,7 @@ export interface PublicReview {
   comment: string;
   customerName: string;
   submittedAt: string;
+  images: string[];
 }
 
 export type ProductSort = "POPULAR" | "PRICE_ASC" | "PRICE_DESC" | "NEWEST";
@@ -103,6 +104,7 @@ export interface Customer {
   email?: string;
   mobile?: string;
   role: "CUSTOMER";
+  mobileVerified?: boolean;
 }
 
 export interface CustomerProfile extends Customer {
@@ -145,6 +147,13 @@ export interface ResetPasswordInput {
 export interface PasswordResetRequestResult {
   message: string;
   developmentResetUrl?: string;
+}
+
+export interface VerificationOtpResult {
+  message: string;
+  verified?: boolean;
+  expiresInMinutes?: number;
+  developmentOtp?: string;
 }
 
 export interface CartLine {
@@ -289,6 +298,7 @@ export interface Review {
   comment: string;
   status: ReviewStatus;
   submittedAt: string;
+  images: string[];
 }
 
 export interface OrderItem {
@@ -376,6 +386,8 @@ export interface CreateReviewInput {
   orderItemId: string;
   rating: number;
   comment: string;
+  imageUrls?: string[];
+  imageFiles?: File[];
 }
 
 export interface PaymentSession {
@@ -461,6 +473,8 @@ export interface MarketplaceApi {
   logout(): Promise<void>;
   forgotPassword(emailOrMobile: string): Promise<PasswordResetRequestResult>;
   resetPassword(input: ResetPasswordInput): Promise<void>;
+  requestVerificationOtp(): Promise<VerificationOtpResult>;
+  verifyOtp(code: string): Promise<VerificationOtpResult>;
   getCart(): Promise<Cart>;
   addCartItem(productId: string, quantity: number): Promise<Cart>;
   updateCartItem(itemId: string, quantity: number): Promise<Cart>;
@@ -494,6 +508,8 @@ export interface MarketplaceApi {
     input: CreateReturnInput,
   ): Promise<ReturnRequest>;
   createReview(productId: string, input: CreateReviewInput): Promise<Review>;
+  updateReview(reviewId: string, input: Omit<CreateReviewInput, "orderItemId">): Promise<Review>;
+  reportReview(reviewId: string, reason?: string): Promise<{ reported: boolean; referenceNumber: string }>;
   getComplaints(): Promise<Complaint[]>;
   getComplaint(complaintId: string): Promise<Complaint>;
   createComplaint(input: CreateComplaintInput): Promise<Complaint>;

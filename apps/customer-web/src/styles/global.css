@@ -266,6 +266,8 @@ h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.12; }
 .pdp-review-list article:first-child { padding-top: 0; }
 .pdp-review-list article > div { display: flex; justify-content: space-between; gap: 20px; }
 .pdp-review-list article span, .pdp-review-list article > p:last-child { color: var(--muted); font-size: .78rem; line-height: 1.6; }
+.pdp-review-images { display: flex !important; justify-content: flex-start !important; gap: 10px !important; margin: 12px 0; flex-wrap: wrap; }
+.pdp-review-images img { width: 88px; height: 88px; border-radius: 10px; border: 1px solid var(--line); object-fit: cover; }
 .pdp-review-stars { display: flex; gap: 2px; margin: 7px 0; color: #d88900; }
 .pdp-review-stars svg { width: 15px; height: 15px; }
 .pdp-empty-reviews { padding: 35px; border-radius: 14px; background: #f7f6f1; text-align: center; }

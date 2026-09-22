@@ -34,6 +34,7 @@ import type {
   Review,
   RazorpayVerificationInput,
   Shipment,
+  VerificationOtpResult,
 } from "./types";
 
 function productQueryString(query: ProductQuery): string {
@@ -113,6 +114,14 @@ export class HttpMarketplaceApi implements MarketplaceApi {
 
   resetPassword(input: ResetPasswordInput): Promise<void> {
     return this.client.post("/auth/reset-password", input);
+  }
+
+  requestVerificationOtp(): Promise<VerificationOtpResult> {
+    return this.client.post("/auth/request-verification-otp");
+  }
+
+  verifyOtp(code: string): Promise<VerificationOtpResult> {
+    return this.client.post("/auth/verify-otp", { code });
   }
 
   getCart(): Promise<Cart> {
@@ -241,10 +250,26 @@ export class HttpMarketplaceApi implements MarketplaceApi {
   }
 
   createReview(productId: string, input: CreateReviewInput): Promise<Review> {
-    return this.client.post(
-      `/products/${encodeURIComponent(productId)}/reviews`,
-      input,
-    );
+    const body = new FormData();
+    body.set('orderItemId', input.orderItemId);
+    body.set('rating', String(input.rating));
+    body.set('comment', input.comment);
+    input.imageUrls?.forEach((url) => body.append('imageUrls', url));
+    input.imageFiles?.forEach((file) => body.append('images', file));
+    return this.client.postForm(`/products/${encodeURIComponent(productId)}/reviews`, body);
+  }
+
+  updateReview(reviewId: string, input: Omit<CreateReviewInput, "orderItemId">): Promise<Review> {
+    const body = new FormData();
+    body.set('rating', String(input.rating));
+    body.set('comment', input.comment);
+    input.imageUrls?.forEach((url) => body.append('imageUrls', url));
+    input.imageFiles?.forEach((file) => body.append('images', file));
+    return this.client.patchForm(`/reviews/${encodeURIComponent(reviewId)}`, body);
+  }
+
+  reportReview(reviewId: string, reason?: string): Promise<{ reported: boolean; referenceNumber: string }> {
+    return this.client.post(`/reviews/${encodeURIComponent(reviewId)}/report`, { reason });
   }
 
   getComplaints(): Promise<Complaint[]> {

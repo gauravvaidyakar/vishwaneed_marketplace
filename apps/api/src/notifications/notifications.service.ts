@@ -26,6 +26,7 @@ export class NotificationsService {
     templateKey: string,
     payload: Record<string, unknown>,
     dedupeKey?: string,
+    deliveryPayload: Record<string, unknown> = payload,
   ) {
     let notificationId: string | undefined;
     try {
@@ -70,7 +71,7 @@ export class NotificationsService {
       const providerReference = await this.whatsapp.send(
         providerTemplate,
         recipient,
-        payload,
+        deliveryPayload,
       );
       return this.prisma.notification.update({
         where: { id: notification.id },
@@ -308,6 +309,72 @@ export class NotificationsService {
         payload,
         `return:${request.id}:vendor:${status}`,
       ),
+    ]);
+  }
+
+  async notifyComplaintStatus(complaintId: string, event: string): Promise<void> {
+    const complaint = await this.prisma.complaint.findUnique({
+      where: { id: complaintId },
+      include: {
+        customer: { select: { userId: true } },
+        vendor: { select: { userId: true, businessName: true } },
+      },
+    });
+    if (!complaint) return;
+    const payload = {
+      referenceNumber: complaint.referenceNumber,
+      subject: complaint.subject,
+      status: complaint.status,
+      event,
+    };
+    await Promise.allSettled([
+      this.sendWhatsApp(
+        complaint.customer.userId,
+        "complaint_status_update",
+        payload,
+        `complaint:${complaint.id}:customer:${event}:${complaint.updatedAt.toISOString()}`,
+      ),
+      ...(complaint.vendor
+        ? [this.sendWhatsApp(
+            complaint.vendor.userId,
+            "vendor_complaint_update",
+            { ...payload, vendorName: complaint.vendor.businessName },
+            `complaint:${complaint.id}:vendor:${event}:${complaint.updatedAt.toISOString()}`,
+          )]
+        : []),
+    ]);
+  }
+
+  async notifyRefundStatus(refundId: string): Promise<void> {
+    const refund = await this.prisma.refund.findUnique({
+      where: { id: refundId },
+      include: {
+        masterOrder: { include: { customer: { select: { userId: true } } } },
+        vendorOrder: { include: { vendor: { select: { userId: true } } } },
+      },
+    });
+    if (!refund) return;
+    const payload = {
+      orderNumber: refund.masterOrder.orderNumber,
+      amount: refund.amount.toString(),
+      status: refund.status,
+      reference: refund.providerReference ?? "",
+    };
+    await Promise.allSettled([
+      this.sendWhatsApp(
+        refund.masterOrder.customer.userId,
+        "refund_status_update",
+        payload,
+        `refund:${refund.id}:customer:${refund.status}`,
+      ),
+      ...(refund.vendorOrder
+        ? [this.sendWhatsApp(
+            refund.vendorOrder.vendor.userId,
+            "vendor_refund_status",
+            payload,
+            `refund:${refund.id}:vendor:${refund.status}`,
+          )]
+        : []),
     ]);
   }
 

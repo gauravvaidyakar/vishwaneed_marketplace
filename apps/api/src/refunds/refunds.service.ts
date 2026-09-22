@@ -3,12 +3,14 @@ import { Prisma, RefundMethod, RefundStatus } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { RazorpayPaymentProvider } from "../payments/payment-provider";
 import { completeRefundFinancials } from "./refund-engine";
+import { NotificationsService } from "../notifications/notifications.service";
 
 @Injectable()
 export class RefundsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly provider: RazorpayPaymentProvider,
+    private readonly notifications: NotificationsService,
   ) {}
 
   list() {
@@ -46,10 +48,12 @@ export class RefundsService {
       throw new BadRequestException("Refund has no source payment");
     }
     if (refund.method === RefundMethod.BANK_TRANSFER) {
-      return this.prisma.refund.update({
+      const updated = await this.prisma.refund.update({
         where: { id },
         data: { status: RefundStatus.PROCESSING },
       });
+      void this.notifications.notifyRefundStatus(updated.id);
+      return updated;
     }
     if (!refund.payment.providerPaymentId) {
       throw new BadRequestException("Source payment is not provider verified");
@@ -69,9 +73,9 @@ export class RefundsService {
         status: RefundStatus.PROCESSING,
       },
     });
-    return providerRefund.status === "processed"
-      ? this.complete(id, providerRefund.id)
-      : pending;
+    if (providerRefund.status === "processed") return this.complete(id, providerRefund.id);
+    void this.notifications.notifyRefundStatus(pending.id);
+    return pending;
   }
 
   async completeBankTransfer(id: string, providerReference: string) {
@@ -87,11 +91,13 @@ export class RefundsService {
   }
 
   async complete(id: string, providerReference?: string) {
-    return this.prisma.$transaction(
+    const completed = await this.prisma.$transaction(
       async (tx) => {
         return completeRefundFinancials(tx, id, providerReference);
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
+    void this.notifications.notifyRefundStatus(completed.id);
+    return completed;
   }
 }

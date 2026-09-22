@@ -5,8 +5,10 @@ import {
   Boxes,
   ClipboardCheck,
   IndianRupee,
+  MessageSquare,
   PackageCheck,
   RotateCcw,
+  Star,
   WalletCards,
   type LucideIcon,
 } from "lucide-react";
@@ -23,12 +25,17 @@ interface Dashboard {
   activeProducts: number;
   pendingProducts: number;
   lowStockProducts: number;
+  totalOrders: number;
   todayOrders: number;
   pendingOrders: number;
   deliveredOrders: number;
+  cancelledOrders: number;
   returnRequests: number;
+  reviewCount: number;
+  complaintCount: number;
   totalSales: string | number;
   totalCommission: string | number;
+  netSettlement: string | number;
   pendingSettlement: string | number;
   settledAmount: string | number;
   recentOrders: VendorOrder[];
@@ -46,11 +53,18 @@ export function DashboardPage() {
   const metrics: Array<[string | number, string, LucideIcon]> = dashboard.data
     ? [
         [dashboard.data.totalProducts, "Products", Boxes],
+        [dashboard.data.totalOrders, "Total orders", ClipboardCheck],
+        [dashboard.data.todayOrders, "New today", PackageCheck],
         [dashboard.data.pendingOrders, "Orders to process", ClipboardCheck],
+        [dashboard.data.deliveredOrders, "Completed orders", PackageCheck],
+        [dashboard.data.cancelledOrders, "Cancelled orders", RotateCcw],
         [dashboard.data.lowStockProducts, "Low stock", AlertTriangle],
         [dashboard.data.returnRequests, "Return requests", RotateCcw],
+        [dashboard.data.reviewCount, "Reviews", Star],
+        [dashboard.data.complaintCount, "Complaints", MessageSquare],
         [money(dashboard.data.totalSales), "Delivered sales", IndianRupee],
         [money(dashboard.data.totalCommission), "Commission", ArrowUpRight],
+        [money(dashboard.data.netSettlement), "Net settlement", WalletCards],
         [
           money(dashboard.data.pendingSettlement),
           "Pending settlement",

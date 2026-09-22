@@ -10,7 +10,7 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService, type JwtSignOptions } from "@nestjs/jwt";
 import { Prisma, Role, UserStatus, type User } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomInt } from "node:crypto";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import type {
@@ -20,6 +20,7 @@ import type {
   RefreshDto,
   RegisterDto,
   ResetPasswordDto,
+  VerifyOtpDto,
 } from "./auth.dto";
 
 interface Tokens {
@@ -222,6 +223,90 @@ export class AuthService {
     return { message: "Password updated successfully" };
   }
 
+  async requestVerificationOtp(
+    userId: string,
+  ): Promise<Record<string, unknown>> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { vendor: { select: { businessMobile: true } } },
+    });
+    if (!user) throw new UnauthorizedException("Account not found");
+    if (user.mobileVerifiedAt) {
+      return { message: "Mobile number is already verified", verified: true };
+    }
+    if (!user.mobile && !user.vendor?.businessMobile) {
+      throw new BadRequestException(
+        "Add a mobile number before requesting verification",
+      );
+    }
+
+    const code = randomInt(100_000, 1_000_000).toString();
+    const codeHash = await hash(code, 12);
+    const ttlMinutes = Math.max(
+      5,
+      Number(this.config.get<string>("OTP_TTL_MINUTES", "10")),
+    );
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+    await this.prisma.$transaction([
+      this.prisma.verificationOtp.deleteMany({ where: { userId } }),
+      this.prisma.verificationOtp.create({
+        data: { userId, codeHash, expiresAt },
+      }),
+    ]);
+    await this.notifications?.sendWhatsApp(
+      userId,
+      "account_verification_otp",
+      { expiresInMinutes: ttlMinutes },
+      `account:${userId}:verification:${expiresAt.toISOString()}`,
+      { otp: code, expiresInMinutes: ttlMinutes },
+    );
+
+    const response: Record<string, unknown> = {
+      message: "Verification code sent securely",
+      expiresInMinutes: ttlMinutes,
+    };
+    if (this.config.get<string>("NODE_ENV", "development") !== "production") {
+      response.developmentOtp = code;
+    }
+    return response;
+  }
+
+  async verifyOtp(
+    userId: string,
+    input: VerifyOtpDto,
+  ): Promise<{ message: string; verified: true }> {
+    const challenge = await this.prisma.verificationOtp.findFirst({
+      where: { userId, consumedAt: null },
+      orderBy: { createdAt: "desc" },
+    });
+    if (
+      !challenge ||
+      challenge.expiresAt.getTime() <= Date.now() ||
+      challenge.attempts >= 5
+    ) {
+      throw new BadRequestException("Verification code is invalid or expired");
+    }
+    if (!(await compare(input.code, challenge.codeHash))) {
+      await this.prisma.verificationOtp.update({
+        where: { id: challenge.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new BadRequestException("Verification code is invalid or expired");
+    }
+    const verifiedAt = new Date();
+    await this.prisma.$transaction([
+      this.prisma.verificationOtp.update({
+        where: { id: challenge.id },
+        data: { consumedAt: verifiedAt },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { mobileVerifiedAt: verifiedAt },
+      }),
+    ]);
+    return { message: "Mobile number verified successfully", verified: true };
+  }
+
   async changeVendorPassword(
     userId: string,
     input: ChangeVendorPasswordDto,
@@ -275,6 +360,7 @@ export class AuthService {
           name: `${profile.firstName} ${profile.lastName}`.trim(),
           email: user.email,
           mobile: user.mobile,
+          mobileVerified: Boolean(user.mobileVerifiedAt),
           role: Role.CUSTOMER,
         },
         ...tokens,
@@ -285,6 +371,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         mobile: user.mobile,
+        mobileVerified: Boolean(user.mobileVerifiedAt),
         role: user.role,
       },
       ...tokens,

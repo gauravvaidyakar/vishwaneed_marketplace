@@ -19,6 +19,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getErrorMessage } from '../api/errors';
+import { marketplaceApi } from '../api';
 import { useAuth } from '../auth/AuthProvider';
 import { ProductGrid } from '../components/product/ProductGrid';
 import { ErrorState } from '../components/ui/AsyncState';
@@ -68,6 +69,7 @@ export function ProductDetailsPage() {
   const [activeImage, setActiveImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const [reportedReview, setReportedReview] = useState<string | null>(null);
 
   useEffect(() => {
     setQuantity(1);
@@ -230,6 +232,7 @@ export function ProductDetailsPage() {
         </div>
         <aside className="pdp-seller-card">
           <Store aria-hidden="true" /><p>Sold by</p><h2>{product.vendor.name}</h2>
+          {product.vendor.rating > 0 && <p><Star fill="currentColor" aria-hidden="true" /> {product.vendor.rating.toFixed(1)} vendor rating</p>}
           {product.vendor.location && <p><MapPin aria-hidden="true" /> {product.vendor.location}</p>}
           {product.vendor.productCount > 0 && <p><PackageCheck aria-hidden="true" /> {product.vendor.productCount} approved {product.vendor.productCount === 1 ? 'product' : 'products'}</p>}
           <Link className="button button--secondary" to={`/products?vendorId=${encodeURIComponent(product.vendor.id)}`}>View seller products</Link>
@@ -243,7 +246,7 @@ export function ProductDetailsPage() {
         ) : reviewsQuery.data?.length ? (
           <div className="pdp-review-layout">
             <div className="pdp-review-summary"><strong>{product.rating.toFixed(1)}</strong><span><Star fill="currentColor" /> out of 5</span><p>{reviewsQuery.data.length} published {reviewsQuery.data.length === 1 ? 'review' : 'reviews'}</p></div>
-            <div className="pdp-review-list">{reviewsQuery.data.map((review) => <article key={review.id}><div><strong>{review.customerName}</strong><span>{new Date(review.submittedAt).toLocaleDateString('en-IN')}</span></div><p className="pdp-review-stars" aria-label={`${review.rating} out of 5 stars`}>{Array.from({ length: 5 }, (_, index) => <Star key={index} fill={index < review.rating ? 'currentColor' : 'none'} />)}</p>{review.comment && <p>{review.comment}</p>}</article>)}</div>
+            <div className="pdp-review-list">{reviewsQuery.data.map((review) => <article key={review.id}><div><strong>{review.customerName}</strong><span>{new Date(review.submittedAt).toLocaleDateString('en-IN')}</span></div><p className="pdp-review-stars" aria-label={`${review.rating} out of 5 stars`}>{Array.from({ length: 5 }, (_, index) => <Star key={index} fill={index < review.rating ? 'currentColor' : 'none'} />)}</p>{review.comment && <p>{review.comment}</p>}{review.images.length > 0 && <div className="pdp-review-images">{review.images.map((image) => <img key={image} src={image} alt="Customer review" loading="lazy" />)}</div>}{isAuthenticated && <button className="text-button" type="button" disabled={reportedReview === review.id} onClick={() => { setReportedReview(review.id); void marketplaceApi.reportReview(review.id).then((result) => setNotice({ kind: 'success', message: `Review reported. Reference ${result.referenceNumber}.` })).catch((error: unknown) => setNotice({ kind: 'error', message: getErrorMessage(error) })).finally(() => setReportedReview(null)); }}>{reportedReview === review.id ? 'Reporting…' : 'Report review'}</button>}</article>)}</div>
           </div>
         ) : <div className="pdp-empty-reviews"><Star /><h3>No published reviews yet</h3><p>Verified customers can review this product after delivery.</p></div>}
       </section>
