@@ -517,9 +517,16 @@ h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.12; }
 
 .tracking-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
 .tracking-card { padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: white; }
+.tracking-page { max-width: 1100px; }
+.tracking-overview { display: flex; align-items: center; gap: 13px; margin-bottom: 20px; padding: 16px 18px; border: 1px solid #cfe2d2; border-radius: 13px; color: var(--green-800); background: #eef7f0; }
+.tracking-overview > div { display: grid; gap: 2px; }
+.tracking-overview span { color: var(--muted); font-size: .74rem; }
 .tracking-card > header { display: flex; justify-content: space-between; gap: 16px; }
 .tracking-card > header span, .tracking-card > header p { color: var(--muted); font-size: .74rem; }
 .tracking-card h2 { margin: 3px 0; font-size: 1.45rem; }
+.tracking-identifiers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.tracking-identifiers > span { display: grid; gap: 3px; padding: 10px 12px; border-radius: 9px; color: var(--muted); background: #f6f6f2; font-size: .72rem; overflow-wrap: anywhere; }
+.tracking-identifiers strong { color: var(--ink); font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; }
 .tracking-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-block: 15px; border-bottom: 1px solid var(--line); }
 .tracking-actions > span { color: var(--muted); font-size: .68rem; margin-right: auto; }
 .tracking-actions > a { display: inline-flex; align-items: center; gap: 4px; color: var(--green-800); font-size: .72rem; font-weight: 700; }
@@ -532,6 +539,11 @@ h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.12; }
 .tracking-timeline li > div { display: grid; gap: 4px; }
 .tracking-timeline small { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .tracking-timeline time { color: var(--muted); font-size: .67rem; }
+.tracking-awaiting { display: flex; align-items: flex-start; gap: 12px; margin-top: 18px; padding: 15px; border-radius: 11px; color: var(--green-800); background: #f4f7f3; }
+.tracking-awaiting > div { display: grid; gap: 4px; }
+.tracking-awaiting p { margin: 0; color: var(--muted); font-size: .74rem; line-height: 1.5; }
+.tracking-card--pending { align-self: start; }
+.is-spinning { animation: spin .7s linear infinite; }
 
 .support-form, .profile-form { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 22px; margin-bottom: 30px; border: 1px solid var(--line); border-radius: 16px; background: white; }
 .support-form > div:first-child { grid-column: 1 / -1; }

@@ -636,6 +636,9 @@ export class OrdersService {
               typeof value.providerStatus === "string"
                 ? value.providerStatus
                 : status.replaceAll("_", " "),
+            ...(typeof value.location === "string" && value.location
+              ? { location: value.location }
+              : {}),
             occurredAt:
               typeof value.occurredAt === "string"
                 ? value.occurredAt

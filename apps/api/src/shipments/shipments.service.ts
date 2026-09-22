@@ -199,6 +199,11 @@ export class ShipmentsService {
         false,
       );
       const awb = this.webhookString(payload, ["awb", "awb_code"], false);
+      const location = this.webhookString(
+        payload,
+        ["current_location", "location", "scan_location"],
+        false,
+      );
       if (!providerShipmentId && !awb) {
         throw new BadRequestException("Shipping reference is missing");
       }
@@ -227,6 +232,7 @@ export class ShipmentsService {
               {
                 status,
                 providerStatus: eventType,
+                ...(location ? { location } : {}),
                 occurredAt: now.toISOString(),
               },
             ] as Prisma.InputJsonValue,
@@ -379,6 +385,9 @@ export class ShipmentsService {
               typeof value.providerStatus === "string"
                 ? value.providerStatus
                 : status.replaceAll("_", " "),
+            ...(typeof value.location === "string" && value.location
+              ? { location: value.location }
+              : {}),
             occurredAt:
               typeof value.occurredAt === "string"
                 ? value.occurredAt

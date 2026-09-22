@@ -13,12 +13,21 @@ export function useOrders(query: OrderQuery = {}) {
   return useQuery({ queryKey: orderKeys.list(query), queryFn: () => marketplaceApi.getOrders(query) });
 }
 
-export function useOrder(orderId: string) {
-  return useQuery({ queryKey: orderKeys.detail(orderId), queryFn: () => marketplaceApi.getOrder(orderId), enabled: Boolean(orderId) });
+export function useOrder(orderId: string, refreshInterval?: number) {
+  return useQuery({ queryKey: orderKeys.detail(orderId), queryFn: () => marketplaceApi.getOrder(orderId), enabled: Boolean(orderId), refetchInterval: refreshInterval, refetchOnWindowFocus: true });
 }
 
 export function useShipmentTracking(shipmentId: string) {
-  return useQuery({ queryKey: orderKeys.tracking(shipmentId), queryFn: () => marketplaceApi.getShipmentTracking(shipmentId), enabled: Boolean(shipmentId) });
+  return useQuery({
+    queryKey: orderKeys.tracking(shipmentId),
+    queryFn: () => marketplaceApi.getShipmentTracking(shipmentId),
+    enabled: Boolean(shipmentId),
+    refetchOnWindowFocus: true,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && ['DELIVERED', 'CANCELLED', 'EXCEPTION'].includes(status) ? false : 30_000;
+    },
+  });
 }
 
 export function useCancelOrderItem(orderId: string) {
