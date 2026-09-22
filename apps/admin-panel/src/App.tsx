@@ -1396,7 +1396,7 @@ function Categories() {
               <small>JPG, JPEG, PNG or WEBP, up to 5 MB.</small>
             </div>
             {(validationError || save.error) && <p className="form-error" role="alert">{validationError || save.error?.message}</p>}
-            <footer><button className="secondary" type="button" disabled={save.isPending} onClick={closeEditor}>Cancel</button><button className="primary" disabled={save.isPending}>{save.isPending ? "Saving…" : "Save category"}</button></footer>
+            <footer><button className="secondary" type="button" disabled={save.isPending} onClick={closeEditor}>Cancel</button><button className="primary" disabled={save.isPending}>{save.isPending ? (image ? "Optimizing & saving…" : "Saving…") : "Save category"}</button></footer>
           </form>
         </div>
       )}

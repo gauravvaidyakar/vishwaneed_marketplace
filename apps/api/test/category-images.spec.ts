@@ -1,31 +1,13 @@
 import { BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import sharp from "sharp";
+import { describe, expect, it } from "vitest";
 import { CategoryImageStorageService } from "../src/categories/category-image-storage.service";
 
-const createdDirectories: string[] = [];
-
-afterEach(async () => {
-  await Promise.all(
-    createdDirectories.splice(0).map((directory) =>
-      rm(directory, { recursive: true, force: true }),
-    ),
-  );
-});
-
-async function storage(maxBytes = "5242880") {
-  const directory = await mkdtemp(join(tmpdir(), "vishwaneed-category-images-"));
-  createdDirectories.push(directory);
+function storage(maxBytes = "5242880") {
   const config = {
     get: (key: string, fallback: string) =>
-      key === "PUBLIC_UPLOAD_DIR"
-        ? directory
-        : key === "MAX_UPLOAD_BYTES"
-          ? maxBytes
-          : fallback,
+      key === "MAX_UPLOAD_BYTES" ? maxBytes : fallback,
   } as ConfigService;
   return new CategoryImageStorageService(config);
 }
@@ -33,7 +15,7 @@ async function storage(maxBytes = "5242880") {
 function imageFile(
   originalname: string,
   mimetype: string,
-  bytes = Buffer.from("image"),
+  bytes: Buffer,
 ): Express.Multer.File {
   return {
     fieldname: "file",
@@ -49,30 +31,60 @@ function imageFile(
   };
 }
 
-describe("category image storage", () => {
-  it("stores, serves and removes a supported public category image", async () => {
-    const service = await storage();
-    const stored = await service.store(imageFile("millets.webp", "image/webp"));
-    expect(stored.url).toMatch(/^\/api\/v1\/category-images\/[\w-]+\.webp$/);
-    const filename = stored.url.split("/").at(-1)!;
-    const served = await service.read(filename);
-    expect(served.mimeType).toBe("image/webp");
-    expect(served.bytes.toString()).toBe("image");
-    await service.removeManagedUrl(stored.url);
-    await expect(service.read(filename)).rejects.toThrow("Category image not found");
+async function png(width = 1200, height = 900): Promise<Buffer> {
+  return sharp({
+    create: {
+      width,
+      height,
+      channels: 3,
+      background: { r: 35, g: 110, b: 62 },
+    },
+  })
+    .png()
+    .toBuffer();
+}
+
+describe("category image optimization", () => {
+  it("converts uploads to a bounded, cacheable WebP asset", async () => {
+    const service = storage();
+    const original = await png();
+    const optimized = await service.optimize(
+      imageFile("millets.png", "image/png", original),
+    );
+    const metadata = await sharp(optimized.bytes).metadata();
+    const categoryId = "5f2315c1-75c1-4b49-91b8-8aea56753f27";
+    const url = service.publicUrl(categoryId, optimized.digest);
+
+    expect(metadata.format).toBe("webp");
+    expect(metadata.width).toBeLessThanOrEqual(800);
+    expect(metadata.height).toBeLessThanOrEqual(600);
+    expect(optimized.bytes.length).toBeLessThan(original.length);
+    expect(url).toMatch(
+      /^\/api\/v1\/category-images\/[0-9a-f-]{36}-[0-9a-f]{16}\.webp$/,
+    );
+    expect(
+      service.categoryIdFromPersistentFilename(url.split("/").at(-1)!),
+    ).toBe(categoryId);
   });
 
   it("rejects a MIME type and extension mismatch", async () => {
-    const service = await storage();
+    const service = storage();
     await expect(
-      service.store(imageFile("not-an-image.pdf", "image/png")),
+      service.optimize(imageFile("not-an-image.pdf", "image/png", await png())),
     ).rejects.toThrow(BadRequestException);
   });
 
-  it("rejects an oversized image", async () => {
-    const service = await storage("4");
+  it("rejects malformed image content", async () => {
+    const service = storage();
     await expect(
-      service.store(imageFile("large.jpg", "image/jpeg", Buffer.alloc(5))),
+      service.optimize(imageFile("fake.png", "image/png", Buffer.from("not an image"))),
+    ).rejects.toThrow("not a valid image");
+  });
+
+  it("rejects an oversized image", async () => {
+    const service = storage("4");
+    await expect(
+      service.optimize(imageFile("large.jpg", "image/jpeg", Buffer.alloc(5))),
     ).rejects.toThrow("must not exceed 4 bytes");
   });
 });

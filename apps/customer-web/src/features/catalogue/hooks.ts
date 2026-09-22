@@ -11,7 +11,12 @@ export const catalogueKeys = {
 };
 
 export function useCategories() {
-  return useQuery({ queryKey: catalogueKeys.categories, queryFn: () => marketplaceApi.getCategories(), staleTime: 10 * 60 * 1000 });
+  return useQuery({
+    queryKey: catalogueKeys.categories,
+    queryFn: () => marketplaceApi.getCategories(),
+    staleTime: 5 * 1000,
+    refetchOnWindowFocus: true,
+  });
 }
 
 export function useProducts(query: ProductQuery) {
