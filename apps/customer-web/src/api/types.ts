@@ -340,6 +340,7 @@ export interface Shipment {
 
 export interface VendorOrder {
   id: string;
+  vendorOrderNumber?: string;
   vendor: VendorSummary;
   status: OrderStatus;
   productSubtotal: Money;

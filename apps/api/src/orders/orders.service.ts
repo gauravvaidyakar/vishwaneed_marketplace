@@ -531,6 +531,7 @@ export class OrdersService {
       },
       vendorOrders: order.vendorOrders.map((vendorOrder) => ({
         id: vendorOrder.id,
+        vendorOrderNumber: vendorOrder.vendorOrderNumber,
         vendor: {
           id: vendorOrder.vendor.id,
           name: vendorOrder.vendor.businessName,
@@ -583,6 +584,11 @@ export class OrdersService {
                   orderItemId: item.review.orderItemId,
                   rating: item.review.rating,
                   comment: item.review.comment,
+                  images: Array.isArray(item.review.images)
+                    ? item.review.images.filter(
+                        (image): image is string => typeof image === "string",
+                      )
+                    : [],
                   status: item.review.status,
                   submittedAt: item.review.createdAt.toISOString(),
                 },
