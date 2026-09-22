@@ -1,6 +1,7 @@
-import { ArrowRight, BadgeCheck, Image as ImageIcon, Leaf, PackageCheck, Truck } from 'lucide-react';
+import { ArrowRight, BadgeCheck, Image as ImageIcon, PackageCheck, Truck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
+import heroVegetables from '../assets/vishwaneed_hero_vegetables_image.png';
 import { ProductGrid } from '../components/product/ProductGrid';
 import { ErrorState, LoadingState } from '../components/ui/AsyncState';
 import { useCategories, useProducts } from '../features/catalogue/hooks';
@@ -30,14 +31,12 @@ export function HomePage() {
         <div className="shell hero-grid">
           <div className="hero-copy">
             <span className="eyebrow">Pure · Natural · Made in India</span>
-            <h1>From our villages,<br /><em>to your home.</em></h1>
+            <h1>From our<br />villages,<br /><em>to your home.</em></h1>
             <p>Discover honest food made by rural producers using traditional methods and carefully selected ingredients.</p>
-            <div className="hero-actions"><Link className="button button--primary" to="/products">Shop now <ArrowRight size={18} /></Link><a className="button button--ghost" href="#our-story">Know our story</a></div>
-            <div className="hero-proof"><span><BadgeCheck size={18} /> Verified producers</span><span><Leaf size={18} /> Thoughtful sourcing</span></div>
+            <div className="hero-actions"><Link className="button button--primary" to="/products">Shop now <ArrowRight size={18} /></Link></div>
           </div>
           <div className="hero-image-wrap">
-            <img src="https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1100&q=78" srcSet="https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=640&q=74 640w, https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1100&q=78 1100w" sizes="(max-width: 760px) 100vw, 50vw" width="1100" height="825" fetchPriority="high" decoding="async" alt="Baskets of freshly harvested gourds and cucumbers" />
-            <div className="hero-card"><span>{featured.data?.meta.total ?? '—'}</span><small>approved products, one trusted marketplace</small></div>
+            <img src={heroVegetables} width="800" height="503" fetchPriority="high" decoding="async" alt="A fresh harvest of bitter gourds, carrots, cucumbers and leafy greens" />
           </div>
         </div>
       </section>
