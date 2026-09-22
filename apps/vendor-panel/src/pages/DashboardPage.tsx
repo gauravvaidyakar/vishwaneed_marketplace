@@ -73,7 +73,7 @@ export function DashboardPage() {
       >
         {dashboard.data && (
           <>
-            <div className="metrics">
+            <div className="metrics dashboard-metrics">
               {metrics.map(([value, label, Icon]) => (
                 <article className="metric" key={label}>
                   <Icon />
@@ -83,7 +83,7 @@ export function DashboardPage() {
               ))}
             </div>
             <div className="dashboard-grid">
-              <section className="card">
+              <section className="card dashboard-orders">
                 <div className="section-title">
                   <div>
                     <small>FULFILMENT</small>
@@ -107,17 +107,19 @@ export function DashboardPage() {
                       <tbody>
                         {dashboard.data.recentOrders.map((order) => (
                           <tr key={order.id}>
-                            <td>
+                            <td data-label="Order">
                               <strong>{order.vendorOrderNumber}</strong>
                             </td>
-                            <td>
+                            <td data-label="Placed">
                               {new Date(order.createdAt).toLocaleDateString(
                                 "en-IN",
                               )}
                             </td>
-                            <td>{order.items.length}</td>
-                            <td>{money(order.orderTotal)}</td>
-                            <td>
+                            <td data-label="Items">{order.items.length}</td>
+                            <td data-label="Total">
+                              {money(order.orderTotal)}
+                            </td>
+                            <td data-label="Status">
                               <Status value={order.status} />
                             </td>
                           </tr>
@@ -127,7 +129,7 @@ export function DashboardPage() {
                   </div>
                 )}
               </section>
-              <section className="card readiness">
+              <section className="card readiness dashboard-readiness">
                 <small>ACCOUNT READINESS</small>
                 <h2>{profile.data?.businessName ?? "Vendor profile"}</h2>
                 <div className="readiness-row">

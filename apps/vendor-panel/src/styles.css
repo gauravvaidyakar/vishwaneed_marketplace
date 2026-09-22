@@ -242,6 +242,7 @@ h2 {
   margin-bottom: 20px;
 }
 .metric {
+  min-width: 0;
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 13px;
@@ -265,7 +266,9 @@ h2 {
   color: var(--muted);
 }
 .metric strong {
-  font-size: 1.3rem;
+  min-width: 0;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  overflow-wrap: anywhere;
 }
 .dashboard-grid {
   display: grid;
@@ -990,6 +993,69 @@ th {
   .review-grid {
     grid-template-columns: 1fr;
   }
+  .dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .dashboard-orders .table-wrap {
+    overflow: visible;
+  }
+  .dashboard-orders table,
+  .dashboard-orders tbody,
+  .dashboard-orders tr,
+  .dashboard-orders td {
+    display: block;
+    width: 100%;
+  }
+  .dashboard-orders table {
+    min-width: 0;
+  }
+  .dashboard-orders thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .dashboard-orders tbody {
+    display: grid;
+    gap: 12px;
+  }
+  .dashboard-orders tbody tr {
+    padding: 10px 14px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: #fbfcfa;
+  }
+  .dashboard-orders td {
+    display: grid;
+    grid-template-columns: minmax(80px, 0.7fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .dashboard-orders td:last-child {
+    border-bottom: 0;
+  }
+  .dashboard-orders td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.67rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .dashboard-readiness .readiness-row > :last-child {
+    margin-left: auto;
+    text-align: right;
+  }
   .product-row {
     grid-template-columns: 58px 1fr;
   }
@@ -1017,6 +1083,12 @@ th {
   .table-wrap th,
   .table-wrap td {
     white-space: nowrap;
+  }
+  .dashboard-orders .table-wrap table {
+    min-width: 0;
+  }
+  .dashboard-orders .table-wrap td {
+    white-space: normal;
   }
   .section-title,
   .readiness-row,
@@ -1125,6 +1197,17 @@ th {
   .metric {
     padding: 16px;
   }
+  .dashboard-metrics .metric {
+    padding: 13px;
+  }
+  .dashboard-metrics .metric svg {
+    width: 31px;
+    height: 31px;
+    padding: 7px;
+  }
+  .dashboard-metrics .metric span {
+    line-height: 1.25;
+  }
   .product-row {
     grid-template-columns: 52px minmax(0, 1fr);
     gap: 11px;
@@ -1192,5 +1275,11 @@ th {
   }
   .auth-card > div {
     min-width: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  .dashboard-metrics {
+    grid-template-columns: 1fr;
   }
 }

@@ -104,9 +104,22 @@ const profile = {
   businessMobile: "9999999999",
   businessAddress: { line1: "Market Road", city: "Pune", state: "Maharashtra", pincode: "411001" },
   status: "APPROVED",
-  documents: [],
+  documents: [
+    { id: "doc-1", type: "PAN", originalName: "pan.pdf", status: "APPROVED" },
+    { id: "doc-2", type: "GST_CERTIFICATE", originalName: "gst.pdf", status: "PENDING" },
+  ],
   bankAccounts: [],
-  inspections: [],
+  inspections: [
+    {
+      id: "inspection-1",
+      status: "SCHEDULED",
+      scheduledAt: "2026-09-25T10:00:00.000Z",
+      location: "Vendor premises",
+      documentsVerified: true,
+      premisesVerified: false,
+      qualityVerified: false,
+    },
+  ],
 };
 
 function mockResponse(url) {
@@ -121,19 +134,36 @@ function mockResponse(url) {
     } };
   if (url.includes("/vendor/dashboard"))
     return { data: {
-      totalProducts: 0,
-      activeProducts: 0,
-      pendingProducts: 0,
-      lowStockProducts: 0,
-      todayOrders: 0,
-      pendingOrders: 0,
-      deliveredOrders: 0,
-      returnRequests: 0,
-      totalSales: 0,
-      totalCommission: 0,
-      pendingSettlement: 0,
-      settledAmount: 0,
-      recentOrders: [],
+      totalProducts: 128,
+      activeProducts: 94,
+      pendingProducts: 12,
+      lowStockProducts: 8,
+      todayOrders: 17,
+      pendingOrders: 24,
+      deliveredOrders: 376,
+      returnRequests: 6,
+      totalSales: 1234567.89,
+      totalCommission: 187654.32,
+      pendingSettlement: 234567.89,
+      settledAmount: 812345.67,
+      recentOrders: [
+        {
+          id: "order-1",
+          vendorOrderNumber: "VWN-RESPONSIVE-ORDER-001",
+          createdAt: "2026-09-21T10:00:00.000Z",
+          items: [{ id: "item-1" }, { id: "item-2" }],
+          orderTotal: 12890.5,
+          status: "PROCESSING",
+        },
+        {
+          id: "order-2",
+          vendorOrderNumber: "VWN-RESPONSIVE-ORDER-002",
+          createdAt: "2026-09-20T10:00:00.000Z",
+          items: [{ id: "item-3" }],
+          orderTotal: 2499,
+          status: "DELIVERED",
+        },
+      ],
     } };
   if (url.includes("/vendor/profile")) return { data: profile };
   const paginated = /\/admin\/(customers|vendors|products|orders|payments|shipments|ledger|replacements|notifications|audit-logs)(\?|$)/.test(url);
@@ -244,13 +274,16 @@ try {
       }`,
     });
     for (const { width, height } of viewports) {
-      await cdp.send("Emulation.setDeviceMetricsOverride", {
-        width,
-        height,
-        deviceScaleFactor: 1,
-        mobile: width < 768,
-      });
       for (const route of panel.routes) {
+        // Reapply an exact CSS viewport before every navigation. Reusing a CDP
+        // target while toggling mobile emulation can otherwise retain Chrome's
+        // scaled layout viewport for the next route.
+        await cdp.send("Emulation.setDeviceMetricsOverride", {
+          width,
+          height,
+          deviceScaleFactor: 1,
+          mobile: false,
+        });
         const expectedUrl = new URL(`${panel.base.replace(/\/$/, "")}${route}`).href;
         await cdp.send("Page.navigate", { url: expectedUrl });
         let audit;
@@ -270,6 +303,7 @@ try {
               documentWidth: document.documentElement.scrollWidth,
               overflow: document.documentElement.scrollWidth > innerWidth + 1,
               heading: document.querySelector('h1,h2')?.textContent?.trim() ?? '',
+              viewportMetaOkay: document.querySelector('meta[name="viewport"]')?.content.includes('width=device-width') ?? false,
               runtimeError: document.body.textContent?.includes('This page could not be displayed') ?? false,
               navigationOkay
             };
@@ -277,16 +311,26 @@ try {
             returnByValue: true,
           });
           const candidate = result.result?.value;
-          if (candidate && candidate.href === expectedUrl && candidate.heading) {
+          if (candidate && candidate.href === expectedUrl && candidate.heading && candidate.viewport === width) {
             audit = candidate;
-            break;
+            // Vite can paint the routed markup just before the linked stylesheet
+            // finishes applying. Keep sampling until the layout is stable so a
+            // transient unstyled table is not reported as horizontal overflow.
+            if (
+              !candidate.overflow &&
+              !candidate.runtimeError &&
+              candidate.navigationOkay &&
+              candidate.viewportMetaOkay
+            ) {
+              break;
+            }
           }
         }
         if (!audit) {
           failures.push({ panel: panel.name, route, width, renderTimeout: true });
           continue;
         }
-        if (audit.overflow || audit.runtimeError || !audit.navigationOkay || audit.viewport !== width) {
+        if (audit.overflow || audit.runtimeError || !audit.navigationOkay || !audit.viewportMetaOkay) {
           failures.push({ panel: panel.name, route, width, ...audit });
         }
       }
