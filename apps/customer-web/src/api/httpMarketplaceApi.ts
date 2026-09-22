@@ -64,10 +64,8 @@ export class HttpMarketplaceApi implements MarketplaceApi {
   private assetUrl(value?: string | null): string | undefined {
     if (!value) return undefined;
     if (/^https?:\/\//i.test(value) || value.startsWith("data:")) return value;
-    const configuredBase: unknown = import.meta.env.VITE_API_URL;
-    if (typeof configuredBase === "string" && /^https?:\/\//i.test(configuredBase)) {
-      return new URL(value, configuredBase).toString();
-    }
+    // Keep API-owned assets same-origin so Vite can proxy them locally and
+    // Vercel can cache immutable, content-hashed images at the edge.
     return value;
   }
 
