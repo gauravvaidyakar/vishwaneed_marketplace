@@ -30,6 +30,32 @@
       "permanent": true
     }
   ],
+  "headers": [
+    {
+      "source": "/assets/:path*",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/api/v1/categories",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400" }
+      ]
+    },
+    {
+      "source": "/api/v1/products",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400" }
+      ]
+    },
+    {
+      "source": "/api/v1/products/:path*",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400" }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/admin",

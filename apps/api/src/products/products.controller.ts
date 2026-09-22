@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -28,10 +29,18 @@ import { ProductsService } from "./products.service";
 @Controller()
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
-  @Get("products") list(@Query() query: ProductQueryDto) {
+  @Get("products")
+  @Header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+  @Header("CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400")
+  @Header("Vercel-CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400")
+  list(@Query() query: ProductQueryDto) {
     return this.products.publicList(query);
   }
-  @Get("products/:id") get(@Param("id") id: string) {
+  @Get("products/:id")
+  @Header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+  @Header("CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400")
+  @Header("Vercel-CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400")
+  get(@Param("id") id: string) {
     return this.products.publicGet(id);
   }
   @Get("vendor/products")

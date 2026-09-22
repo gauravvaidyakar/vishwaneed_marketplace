@@ -15,11 +15,11 @@ export function useCategories() {
 }
 
 export function useProducts(query: ProductQuery) {
-  return useQuery({ queryKey: catalogueKeys.products(query), queryFn: () => marketplaceApi.getProducts(query), placeholderData: keepPreviousData });
+  return useQuery({ queryKey: catalogueKeys.products(query), queryFn: () => marketplaceApi.getProducts(query), placeholderData: keepPreviousData, staleTime: 5 * 60 * 1000 });
 }
 
 export function useProduct(idOrSlug: string) {
-  return useQuery({ queryKey: catalogueKeys.product(idOrSlug), queryFn: () => marketplaceApi.getProduct(idOrSlug), enabled: Boolean(idOrSlug) });
+  return useQuery({ queryKey: catalogueKeys.product(idOrSlug), queryFn: () => marketplaceApi.getProduct(idOrSlug), enabled: Boolean(idOrSlug), staleTime: 5 * 60 * 1000 });
 }
 
 export function useProductReviews(productId: string) {
@@ -27,6 +27,7 @@ export function useProductReviews(productId: string) {
     queryKey: catalogueKeys.reviews(productId),
     queryFn: () => marketplaceApi.getProductReviews(productId),
     enabled: Boolean(productId),
+    staleTime: 2 * 60 * 1000,
   });
 }
 
@@ -35,5 +36,6 @@ export function useRelatedProducts(categoryId: string) {
     queryKey: catalogueKeys.related(categoryId),
     queryFn: () => marketplaceApi.getProducts({ category: categoryId, page: 1, limit: 5 }),
     enabled: Boolean(categoryId),
+    staleTime: 5 * 60 * 1000,
   });
 }

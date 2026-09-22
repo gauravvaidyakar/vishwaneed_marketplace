@@ -6,7 +6,7 @@ services:
     region: singapore
     autoDeployTrigger: commit
     buildCommand: npm ci --include=dev && npm run prisma:generate --workspace @vishwaneed/api && npm run build --workspace @vishwaneed/api
-    startCommand: npm run prisma:migrate --workspace @vishwaneed/api && npm run prisma:seed --workspace @vishwaneed/api && node apps/api/dist/main.js
+    startCommand: npm run prisma:migrate --workspace @vishwaneed/api && node apps/api/dist/main.js
     healthCheckPath: /api/v1/categories
     envVars:
       - key: NODE_ENV

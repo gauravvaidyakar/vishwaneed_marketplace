@@ -26,15 +26,25 @@ import { CreateCategoryDto, UpdateCategoryDto } from "./categories.dto";
 @Controller()
 export class CategoriesController {
   constructor(private readonly categories: CategoriesService) {}
-  @Get("categories") list() {
+  @Get("categories")
+  @Header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+  @Header("CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400")
+  @Header("Vercel-CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400")
+  list() {
     return this.categories.list();
   }
-  @Get("categories/:id") get(@Param("id") id: string) {
+  @Get("categories/:id")
+  @Header("Cache-Control", "public, max-age=60, stale-while-revalidate=300")
+  @Header("CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400")
+  @Header("Vercel-CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=86400")
+  get(@Param("id") id: string) {
     return this.categories.get(id);
   }
   @Get("category-images/:filename")
   @Header("Cross-Origin-Resource-Policy", "cross-origin")
-  @Header("Cache-Control", "public, max-age=86400")
+  @Header("Cache-Control", "public, max-age=86400, immutable")
+  @Header("CDN-Cache-Control", "public, s-maxage=31536000, immutable")
+  @Header("Vercel-CDN-Cache-Control", "public, s-maxage=31536000, immutable")
   async image(@Param("filename") filename: string) {
     const image = await this.categories.readImage(filename);
     return new StreamableFile(image.bytes, {

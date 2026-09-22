@@ -36,7 +36,7 @@ export function HomePage() {
             <div className="hero-proof"><span><BadgeCheck size={18} /> Verified producers</span><span><Leaf size={18} /> Thoughtful sourcing</span></div>
           </div>
           <div className="hero-image-wrap">
-            <img src="https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1400&q=88" alt="Baskets of freshly harvested gourds and cucumbers" />
+            <img src="https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1100&q=78" srcSet="https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=640&q=74 640w, https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1100&q=78 1100w" sizes="(max-width: 760px) 100vw, 50vw" width="1100" height="825" fetchPriority="high" decoding="async" alt="Baskets of freshly harvested gourds and cucumbers" />
             <div className="hero-card"><span>{featured.data?.meta.total ?? '—'}</span><small>approved products, one trusted marketplace</small></div>
           </div>
         </div>
@@ -51,7 +51,7 @@ export function HomePage() {
         {categories.data && <div className="category-grid">{categories.data.map((category) => <Link className="category-card" key={category.id} to={`/products?category=${category.id}`}>{category.imageUrl ? <img src={category.imageUrl} alt="" /> : <span className="category-image-fallback" aria-hidden="true"><ImageIcon /></span>}<div><h3>{category.name}</h3><p>{category.description}</p></div><ArrowRight aria-hidden="true" /></Link>)}</div>}
       </section>
 
-      <section className="story-section" id="our-story"><div className="shell story-grid"><div><span className="eyebrow">Made in India story</span><h2>Real producers. Real food. A fairer connection.</h2><p>Vishwaneed helps customers discover regionally rooted food while giving rural producers a clear path to market. Every listed product moves through marketplace approval before it reaches the store.</p><Link className="text-link" to="/products">Discover the marketplace <ArrowRight size={17} /></Link></div><img src="https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=1200&q=85" alt="A farmer working in green fields" /></div></section>
+      <section className="story-section" id="our-story"><div className="shell story-grid"><div><span className="eyebrow">Made in India story</span><h2>Real producers. Real food. A fairer connection.</h2><p>Vishwaneed helps customers discover regionally rooted food while giving rural producers a clear path to market. Every listed product moves through marketplace approval before it reaches the store.</p><Link className="text-link" to="/products">Discover the marketplace <ArrowRight size={17} /></Link></div><img src="https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=960&q=76" width="960" height="720" loading="lazy" decoding="async" alt="A farmer working in green fields" /></div></section>
 
       <section className="section shell" aria-labelledby="featured-heading">
         <div className="section-heading"><div><span className="eyebrow">Freshly approved</span><h2 id="featured-heading">New arrivals</h2></div><Link to="/products?sort=NEWEST">View all <ArrowRight size={17} /></Link></div>
