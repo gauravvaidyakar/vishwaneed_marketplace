@@ -38,8 +38,12 @@ export class CategoryImageStorageService {
       );
     }
 
+    return this.optimizeBytes(file.buffer);
+  }
+
+  async optimizeBytes(buffer: Buffer): Promise<OptimizedCategoryImage> {
     try {
-      const bytes = await sharp(file.buffer, { failOn: "error" })
+      const bytes = await sharp(buffer, { failOn: "error" })
         .rotate()
         .resize({
           width: 800,

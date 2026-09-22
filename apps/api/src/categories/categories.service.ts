@@ -93,7 +93,7 @@ export class CategoriesService {
   }
   async readImage(filename: string) {
     const categoryId = this.images.categoryIdFromPersistentFilename(filename);
-    if (!categoryId) return this.images.readLegacy(filename);
+    if (!categoryId) return this.readAndMigrateLegacyImage(filename);
     const category = await this.prisma.category.findUnique({
       where: { id: categoryId },
       select: { imageUrl: true, imageData: true, imageMimeType: true },
@@ -109,6 +109,32 @@ export class CategoriesService {
       bytes: Buffer.from(category.imageData),
       mimeType: category.imageMimeType,
     };
+  }
+  private async readAndMigrateLegacyImage(filename: string) {
+    const legacy = await this.images.readLegacy(filename);
+    const legacyUrl = `/api/v1/category-images/${filename}`;
+    const category = await this.prisma.category.findFirst({
+      where: { imageUrl: legacyUrl },
+      select: { id: true },
+    });
+    if (!category) return legacy;
+
+    try {
+      const optimized = await this.images.optimizeBytes(legacy.bytes);
+      const imageUrl = this.images.publicUrl(category.id, optimized.digest);
+      await this.prisma.category.updateMany({
+        where: { id: category.id, imageUrl: legacyUrl },
+        data: {
+          imageUrl,
+          imageData: optimized.bytes,
+          imageMimeType: optimized.mimeType,
+        },
+      });
+      return { bytes: optimized.bytes, mimeType: optimized.mimeType };
+    } catch {
+      // Legacy files remain readable even if an old asset cannot be optimized.
+      return legacy;
+    }
   }
   private async requireAny(id: string) {
     const category = await this.prisma.category.findUnique({

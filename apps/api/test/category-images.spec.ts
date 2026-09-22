@@ -67,6 +67,15 @@ describe("category image optimization", () => {
     ).toBe(categoryId);
   });
 
+  it("optimizes a trusted legacy image without multipart metadata", async () => {
+    const service = storage();
+    const optimized = await service.optimizeBytes(await png(640, 480));
+    const metadata = await sharp(optimized.bytes).metadata();
+    expect(metadata.format).toBe("webp");
+    expect(metadata.width).toBe(640);
+    expect(metadata.height).toBe(480);
+  });
+
   it("rejects a MIME type and extension mismatch", async () => {
     const service = storage();
     await expect(
