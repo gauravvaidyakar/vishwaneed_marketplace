@@ -73,15 +73,25 @@ export class WhatsAppProviderRouter implements WhatsAppProvider {
   private readonly development = new DevelopmentWhatsAppProvider();
   private readonly interakt: WhatsAppProvider;
   private readonly logger = new Logger(WhatsAppProviderRouter.name);
+  private readonly production: boolean;
+  private readonly configuredProvider: string;
 
   constructor(
     config: ConfigService,
     private readonly settings: IntegrationSettingsService,
   ) {
     this.interakt = new InteraktWhatsAppProvider(config, settings);
-    this.logger.warn(
-      "WhatsApp uses the development simulator until an Interakt API key is configured",
-    );
+    this.production =
+      config.get<string>("NODE_ENV", "development") === "production";
+    this.configuredProvider = config
+      .get<string>(
+        "WHATSAPP_PROVIDER",
+        this.production ? "INTERAKT" : "DEVELOPMENT",
+      )
+      .toUpperCase();
+    if (!this.production && this.configuredProvider === "DEVELOPMENT") {
+      this.logger.warn("WhatsApp is using the development simulator");
+    }
   }
 
   async send(
@@ -89,9 +99,15 @@ export class WhatsAppProviderRouter implements WhatsAppProvider {
     recipient: string,
     payload: Record<string, unknown>,
   ) {
-    const provider = (await this.settings.has("INTERAKT_API_KEY"))
-      ? this.interakt
-      : this.development;
+    if (this.production && this.configuredProvider === "DEVELOPMENT") {
+      throw new ServiceUnavailableException(
+        "The WhatsApp simulator is disabled in production",
+      );
+    }
+    const useInterakt =
+      this.configuredProvider === "INTERAKT" ||
+      (await this.settings.has("INTERAKT_API_KEY"));
+    const provider = useInterakt ? this.interakt : this.development;
     return provider.send(templateKey, recipient, payload);
   }
 }

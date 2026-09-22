@@ -148,12 +148,27 @@ export class VendorsService {
 
   async updateContact(userId: string, input: UpdateVendorContactDto) {
     const vendor = await this.getByUser(userId);
-    return this.prisma.vendor.update({
-      where: { id: vendor.id },
-      data: {
-        businessEmail: input.businessEmail?.toLowerCase(),
-        businessMobile: input.businessMobile,
-      },
+    const normalizeMobile = (value?: string | null) =>
+      value?.replace(/^\+91/, "") ?? "";
+    const mobileChanged =
+      normalizeMobile(vendor.businessMobile) !==
+      normalizeMobile(input.businessMobile);
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.vendor.update({
+        where: { id: vendor.id },
+        data: {
+          businessEmail: input.businessEmail?.toLowerCase(),
+          businessMobile: input.businessMobile,
+        },
+      });
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          mobile: input.businessMobile,
+          ...(mobileChanged ? { mobileVerifiedAt: null } : {}),
+        },
+      });
+      return updated;
     });
   }
 

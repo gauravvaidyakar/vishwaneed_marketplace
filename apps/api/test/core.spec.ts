@@ -3,6 +3,7 @@ import type { ConfigService } from "@nestjs/config";
 import type { JwtService } from "@nestjs/jwt";
 import {
   InspectionStatus,
+  NotificationStatus,
   ProductStatus,
   Role,
   VendorStatus,
@@ -194,8 +195,12 @@ describe("platform security rules", () => {
   });
 
   it("verifies a one-time code and consumes it while marking the mobile verified", async () => {
-    const consumed = vi.fn().mockResolvedValue({});
+    const consumed = vi.fn().mockResolvedValue({ count: 1 });
     const verifyUser = vi.fn().mockResolvedValue({});
+    const transactionClient = {
+      verificationOtp: { updateMany: consumed },
+      user: { update: verifyUser },
+    };
     const prisma = {
       verificationOtp: {
         findFirst: vi.fn().mockResolvedValue({
@@ -204,10 +209,11 @@ describe("platform security rules", () => {
           expiresAt: new Date(Date.now() + 60_000),
           attempts: 0,
         }),
-        update: consumed,
       },
-      user: { update: verifyUser },
-      $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
+      $transaction: vi.fn(
+        (operation: (tx: typeof transactionClient) => Promise<unknown>) =>
+          operation(transactionClient),
+      ),
     } as unknown as PrismaService;
     const service = new AuthService(prisma, {} as JwtService, {} as ConfigService);
 
@@ -215,8 +221,42 @@ describe("platform security rules", () => {
       message: "Mobile number verified successfully",
       verified: true,
     });
-    expect(consumed).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "otp-id" } }));
+    expect(consumed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "otp-id", consumedAt: null },
+      }),
+    );
     expect(verifyUser).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "user-id" } }));
+  });
+
+  it("rejects a verification code that another request already consumed", async () => {
+    const verifyUser = vi.fn();
+    const transactionClient = {
+      verificationOtp: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      user: { update: verifyUser },
+    };
+    const prisma = {
+      verificationOtp: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "otp-id",
+          codeHash: await hash("123456", 12),
+          expiresAt: new Date(Date.now() + 60_000),
+          attempts: 0,
+        }),
+      },
+      $transaction: vi.fn(
+        (operation: (tx: typeof transactionClient) => Promise<unknown>) =>
+          operation(transactionClient),
+      ),
+    } as unknown as PrismaService;
+    const service = new AuthService(prisma, {} as JwtService, {} as ConfigService);
+
+    await expect(service.verifyOtp("user-id", { code: "123456" })).rejects.toThrow(
+      "invalid or expired",
+    );
+    expect(verifyUser).not.toHaveBeenCalled();
   });
 
   it("counts an invalid one-time-code attempt without exposing the expected code", async () => {
@@ -236,6 +276,94 @@ describe("platform security rules", () => {
 
     await expect(service.verifyOtp("user-id", { code: "654321" })).rejects.toThrow("invalid or expired");
     expect(update).toHaveBeenCalledWith({ where: { id: "otp-id" }, data: { attempts: { increment: 1 } } });
+  });
+
+  it("stores only a hash and sends the generated verification code through notifications", async () => {
+    const create = vi.fn().mockResolvedValue({});
+    const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
+    const sendWhatsApp = vi.fn().mockResolvedValue({
+      status: NotificationStatus.SENT,
+    });
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "user-id",
+          mobile: "9876543210",
+          mobileVerifiedAt: null,
+          vendor: null,
+        }),
+      },
+      verificationOtp: { create, deleteMany },
+      $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
+    } as unknown as PrismaService;
+    const config = {
+      get: vi.fn((key: string, fallback: string) =>
+        key === "NODE_ENV" ? "development" : fallback,
+      ),
+    } as unknown as ConfigService;
+    const notifications = { sendWhatsApp } as unknown as NotificationsService;
+    const service = new AuthService(
+      prisma,
+      {} as JwtService,
+      config,
+      notifications,
+    );
+
+    const result = await service.requestVerificationOtp("user-id");
+    const deliveryPayload = sendWhatsApp.mock.calls[0]?.[4] as {
+      otp: string;
+    };
+    const createInput = create.mock.calls[0]?.[0] as
+      | { data: { codeHash: string } }
+      | undefined;
+    const storedHash = createInput?.data.codeHash ?? "";
+
+    expect(deliveryPayload.otp).toMatch(/^\d{6}$/);
+    expect(storedHash).not.toBe(deliveryPayload.otp);
+    await expect(compare(deliveryPayload.otp, storedHash)).resolves.toBe(true);
+    expect(result).toMatchObject({
+      message: "Verification code sent securely",
+      developmentOtp: deliveryPayload.otp,
+    });
+  });
+
+  it("removes the challenge and reports failure when OTP delivery fails", async () => {
+    const deleteMany = vi
+      .fn()
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: "user-id",
+          mobile: "9876543210",
+          mobileVerifiedAt: null,
+          vendor: null,
+        }),
+      },
+      verificationOtp: {
+        create: vi.fn().mockResolvedValue({}),
+        deleteMany,
+      },
+      $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
+    } as unknown as PrismaService;
+    const config = {
+      get: vi.fn((_key: string, fallback: string) => fallback),
+    } as unknown as ConfigService;
+    const notifications = {
+      sendWhatsApp: vi.fn().mockResolvedValue(null),
+    } as unknown as NotificationsService;
+    const service = new AuthService(
+      prisma,
+      {} as JwtService,
+      config,
+      notifications,
+    );
+
+    await expect(service.requestVerificationOtp("user-id")).rejects.toThrow(
+      "could not be delivered",
+    );
+    expect(deleteMany).toHaveBeenLastCalledWith({ where: { userId: "user-id" } });
   });
 
   it("requires independent strong JWT secrets and field encryption", () => {

@@ -450,6 +450,26 @@ th {
   width: 100%;
   text-align: center;
 }
+.verification-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-color: #ead28a;
+  background: #fff8e4;
+  color: #75560d;
+}
+.verification-card > div {
+  flex: 1;
+}
+.verification-card p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+.verification-card--verified {
+  border-color: #bfdac7;
+  background: #edf7f0;
+  color: var(--green-800);
+}
 .password-hint {
   color: var(--muted);
   line-height: 1.45;
@@ -1017,6 +1037,17 @@ th {
   .page-head > button,
   .page-head > a {
     width: 100%;
+  }
+  .verification-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .verification-card > div {
+    min-width: calc(100% - 48px);
+  }
+  .verification-card > a {
+    width: 100%;
+    text-align: center;
   }
   .metrics,
   .form-grid,

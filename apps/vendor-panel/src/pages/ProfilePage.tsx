@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, FileUp, ShieldCheck } from "lucide-react";
+import { AlertCircle, Download, FileUp, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { Link } from "react-router-dom";
 import { api, type VendorProfile } from "../api/client";
+import { useAuth } from "../auth/AuthProvider";
 import { AsyncState, Status } from "../components/AsyncState";
 import { Field } from "./AuthPages";
 import { PageHead } from "./DashboardPage";
@@ -39,6 +41,7 @@ interface ContactFormValue {
 }
 
 export function ProfilePage() {
+  const { session } = useAuth();
   const client = useQueryClient();
   const query = useQuery({
     queryKey: ["profile"],
@@ -110,6 +113,30 @@ export function ProfilePage() {
       >
         {profile && (
           <div className="stack">
+            <section
+              className={`card verification-card${
+                session?.user.mobileVerified ? " verification-card--verified" : ""
+              }`}
+            >
+              {session?.user.mobileVerified ? <ShieldCheck /> : <AlertCircle />}
+              <div>
+                <strong>
+                  {session?.user.mobileVerified
+                    ? "WhatsApp mobile verified"
+                    : "Mobile verification required"}
+                </strong>
+                <p>
+                  {session?.user.mobileVerified
+                    ? `Order and security updates can be delivered to ${session.user.mobile ?? profile.businessMobile}.`
+                    : `Verify ${session?.user.mobile ?? profile.businessMobile ?? "your business mobile"} before relying on WhatsApp notifications.`}
+                </p>
+              </div>
+              {!session?.user.mobileVerified && (
+                <Link className="primary" to="/verify-mobile">
+                  Verify now
+                </Link>
+              )}
+            </section>
             <section className="card">
               <div className="section-title">
                 <ShieldCheck />
@@ -275,6 +302,7 @@ export function ProfilePage() {
 
 function ContactForm({ profile }: { profile: VendorProfile }) {
   const client = useQueryClient();
+  const { session, updateUser } = useAuth();
   const [notice, setNotice] = useState("");
   const form = useForm<ContactFormValue>({
     values: {
@@ -285,8 +313,22 @@ function ContactForm({ profile }: { profile: VendorProfile }) {
   const save = useMutation({
     mutationFn: (value: ContactFormValue) =>
       api.patch("/vendor/contact", value),
-    onSuccess: () => {
-      setNotice("WhatsApp contact saved.");
+    onSuccess: (_result, submitted) => {
+      const changed =
+        submitted.businessMobile.replace(/^\+91/, "") !==
+        (profile.businessMobile ?? "").replace(/^\+91/, "");
+      if (session) {
+        updateUser({
+          ...session.user,
+          mobile: submitted.businessMobile,
+          mobileVerified: changed ? false : session.user.mobileVerified,
+        });
+      }
+      setNotice(
+        changed
+          ? "WhatsApp contact saved. Verify the new number before notifications can be trusted."
+          : "WhatsApp contact saved.",
+      );
       void client.invalidateQueries({ queryKey: ["profile"] });
     },
   });

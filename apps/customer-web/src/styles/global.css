@@ -568,6 +568,10 @@ h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.12; }
 .attachment-note { color: var(--muted); font-size: .72rem; }
 .profile-page { max-width: 900px; }
 .profile-form { margin-bottom: 0; }
+.verification-banner { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding: 15px 17px; border: 1px solid #edd89a; border-radius: 12px; color: #74550d; background: #fff7df; }
+.verification-banner > div { display: grid; gap: 2px; margin-right: auto; }
+.verification-banner span { color: var(--muted); font-size: .75rem; }
+.verification-banner--verified { color: var(--green-800); border-color: #c8dfce; background: #eef7f0; }
 .success-inline { display: flex; align-items: center; gap: 6px; color: var(--green-800); }
 .payment-recovery > small { display: block; margin-top: 10px; color: var(--muted); }
 .payment-recovery > p { padding: 10px; border-radius: 8px; background: #fff3d5; color: #72520b; }

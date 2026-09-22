@@ -8,7 +8,7 @@ export class CustomersService {
     const profile = await this.prisma.customerProfile.findUnique({
       where: { userId },
       include: {
-        user: { select: { email: true, mobile: true, createdAt: true } },
+        user: { select: { email: true, mobile: true, mobileVerifiedAt: true, createdAt: true } },
       },
     });
     if (!profile) throw new NotFoundException("Customer profile not found");
@@ -17,6 +17,7 @@ export class CustomersService {
       name: `${profile.firstName} ${profile.lastName}`.trim(),
       email: profile.user.email,
       mobile: profile.user.mobile,
+      mobileVerified: Boolean(profile.user.mobileVerifiedAt),
       role: "CUSTOMER",
       createdAt: profile.user.createdAt,
       marketingOptIn: profile.marketingOptIn,
@@ -25,13 +26,22 @@ export class CustomersService {
   async update(userId: string, input: UpdateCustomerDto) {
     const current = await this.prisma.customerProfile.findUnique({
       where: { userId },
+      include: { user: { select: { mobile: true } } },
     });
     if (!current) throw new NotFoundException("Customer profile not found");
     const names = input.name?.trim().split(/\s+/);
+    const normalizedMobile = (value?: string | null) => value?.replace(/^\+91/, "") ?? "";
+    const mobileChanged =
+      input.mobile !== undefined &&
+      normalizedMobile(input.mobile) !== normalizedMobile(current.user.mobile);
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: userId },
-        data: { email: input.email?.toLowerCase(), mobile: input.mobile },
+        data: {
+          email: input.email?.toLowerCase(),
+          mobile: input.mobile,
+          ...(mobileChanged ? { mobileVerifiedAt: null } : {}),
+        },
       }),
       this.prisma.customerProfile.update({
         where: { userId },

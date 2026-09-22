@@ -4,11 +4,18 @@ import {
   ForbiddenException,
   Injectable,
   Optional,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService, type JwtSignOptions } from "@nestjs/jwt";
-import { Prisma, Role, UserStatus, type User } from "@prisma/client";
+import {
+  NotificationStatus,
+  Prisma,
+  Role,
+  UserStatus,
+  type User,
+} from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import { PrismaService } from "../database/prisma.service";
@@ -253,13 +260,22 @@ export class AuthService {
         data: { userId, codeHash, expiresAt },
       }),
     ]);
-    await this.notifications?.sendWhatsApp(
+    const delivery = await this.notifications?.sendWhatsApp(
       userId,
       "account_verification_otp",
       { expiresInMinutes: ttlMinutes },
       `account:${userId}:verification:${expiresAt.toISOString()}`,
       { otp: code, expiresInMinutes: ttlMinutes },
     );
+    if (
+      this.notifications &&
+      (!delivery || delivery.status !== NotificationStatus.SENT)
+    ) {
+      await this.prisma.verificationOtp.deleteMany({ where: { userId } });
+      throw new ServiceUnavailableException(
+        "Verification code could not be delivered. Please try again later.",
+      );
+    }
 
     const response: Record<string, unknown> = {
       message: "Verification code sent securely",
@@ -294,16 +310,19 @@ export class AuthService {
       throw new BadRequestException("Verification code is invalid or expired");
     }
     const verifiedAt = new Date();
-    await this.prisma.$transaction([
-      this.prisma.verificationOtp.update({
-        where: { id: challenge.id },
+    await this.prisma.$transaction(async (tx) => {
+      const consumed = await tx.verificationOtp.updateMany({
+        where: { id: challenge.id, consumedAt: null },
         data: { consumedAt: verifiedAt },
-      }),
-      this.prisma.user.update({
+      });
+      if (consumed.count !== 1) {
+        throw new BadRequestException("Verification code is invalid or expired");
+      }
+      await tx.user.update({
         where: { id: userId },
         data: { mobileVerifiedAt: verifiedAt },
-      }),
-    ]);
+      });
+    });
     return { message: "Mobile number verified successfully", verified: true };
   }
 
