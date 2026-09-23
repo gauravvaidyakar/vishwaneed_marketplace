@@ -375,6 +375,28 @@ variables remain fallback values when no database override exists.
 
 ---
 
+# 28B. HOMEPAGE HERO CONTENT
+
+Public:
+
+- `GET /home-hero-slides` returns active slides with uploaded images in display order.
+- `GET /home-hero-images/:filename` streams immutable, content-hashed WEBP assets.
+
+Admin-only:
+
+- `GET /admin/home-hero-slides`
+- `POST /admin/home-hero-slides`
+- `PATCH /admin/home-hero-slides/:id`
+- `DELETE /admin/home-hero-slides/:id`
+- `POST /admin/home-hero-slides/:id/image` using multipart field `file`
+- `DELETE /admin/home-hero-slides/:id/image`
+
+The API accepts JPG, JPEG, PNG and WEBP uploads up to 5 MB, normalizes them to
+WEBP and stores them persistently in PostgreSQL. CTA destinations must be
+internal application paths. Public responses never include stored image bytes.
+
+---
+
 # 29. STANDARD SUCCESS RESPONSE
 
 {

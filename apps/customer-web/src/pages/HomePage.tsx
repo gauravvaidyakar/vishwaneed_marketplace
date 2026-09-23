@@ -6,12 +6,13 @@ import { HomeHeroCarousel, type HomeHeroSlide } from '../components/home/HomeHer
 import { ScrollReveal } from '../components/home/ScrollReveal';
 import { ProductGrid } from '../components/product/ProductGrid';
 import { ErrorState, LoadingState } from '../components/ui/AsyncState';
-import { useCategories, useProducts } from '../features/catalogue/hooks';
+import { useCategories, useHomeHeroSlides, useProducts } from '../features/catalogue/hooks';
 import type { VendorSummary } from '../api/types';
 
 const storyImage = 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?auto=format&fit=crop&w=960&q=76';
 
 export function HomePage() {
+  const managedHero = useHomeHeroSlides();
   const categories = useCategories();
   const featured = useProducts({ limit: 4, page: 1, sort: 'NEWEST' });
   const bestSellers = useProducts({ sort: 'POPULAR', limit: 4, page: 1 });
@@ -29,6 +30,18 @@ export function HomePage() {
     .filter((product, index, all) => all.findIndex((candidate) => candidate.id === product.id) === index)
     .slice(0, 4), [bestSellers.data?.items, featured.data?.items]);
   const heroSlides = useMemo<HomeHeroSlide[]>(() => {
+    if (managedHero.data?.length) {
+      return managedHero.data.map((slide) => ({
+        id: slide.id,
+        imageUrl: slide.imageUrl,
+        imageAlt: slide.imageAlt,
+        eyebrow: slide.eyebrow,
+        title: slide.title,
+        description: slide.description,
+        ctaLabel: slide.ctaLabel,
+        href: slide.ctaHref,
+      }));
+    }
     const slides: HomeHeroSlide[] = [{
       id: 'vishwaneed-marketplace',
       imageUrl: heroVegetables,
@@ -64,7 +77,7 @@ export function HomePage() {
       });
     });
     return slides;
-  }, [bestSellers.data?.items, featured.data?.items]);
+  }, [bestSellers.data?.items, featured.data?.items, managedHero.data]);
 
   return (
     <>

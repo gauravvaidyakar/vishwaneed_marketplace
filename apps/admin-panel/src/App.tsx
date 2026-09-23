@@ -42,12 +42,14 @@ import {
 import { api, assetUrl, money, type Page } from "./api";
 import { useAuth } from "./auth";
 import { Async, Head, Pager, Status } from "./components";
+import { HomeHeroSlides } from "./HomeHeroSlides";
 const nav = [
   ["/", "Dashboard", BarChart3],
   ["/vendors", "Vendors & KYC", Building2],
   ["/customers", "Customers", Users],
   ["/products", "Products", ShoppingBag],
   ["/categories", "Categories", Layers3],
+  ["/homepage", "Homepage hero", ImageIcon],
   ["/orders", "Orders", PackageCheck],
   ["/payments", "Payments", WalletCards],
   ["/shipments", "Shipments", Truck],
@@ -2290,6 +2292,7 @@ export function App() {
           <Route path="customers" element={<Resource kind="customers" />} />
           <Route path="products" element={<Products />} />
           <Route path="categories" element={<Categories />} />
+          <Route path="homepage" element={<HomeHeroSlides />} />
           <Route path="orders" element={<Orders />} />
           <Route path="payments" element={<Resource kind="payments" />} />
           <Route path="shipments" element={<Resource kind="shipments" />} />

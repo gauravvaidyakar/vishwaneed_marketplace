@@ -14,6 +14,7 @@ import { validateEnvironment } from "./config/environment";
 import { CustomersModule } from "./customers/customers.module";
 import { DatabaseModule } from "./database/database.module";
 import { InventoryModule } from "./inventory/inventory.module";
+import { HomeHeroModule } from "./home-hero/home-hero.module";
 import { IntegrationSettingsModule } from "./integration-settings/integration-settings.module";
 import { LedgerModule } from "./ledger/ledger.module";
 import { NotificationsModule } from "./notifications/notifications.module";
@@ -47,6 +48,7 @@ import { VendorsModule } from "./vendors/vendors.module";
     CategoriesModule,
     ProductsModule,
     InventoryModule,
+    HomeHeroModule,
     CartModule,
     CheckoutModule,
     OrdersModule,

@@ -50,6 +50,7 @@ const routeCases = [
   ["/vendors", "Vendors, KYC & inspections"],
   ["/products", "Product moderation"],
   ["/categories", "Categories"],
+  ["/homepage", "Homepage hero"],
   ["/orders", "Master orders"],
   ["/payments", "Payments"],
   ["/shipments", "Shipments"],

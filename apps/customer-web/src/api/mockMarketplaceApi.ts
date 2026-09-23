@@ -92,6 +92,10 @@ export function createMockMarketplaceApi(): MarketplaceApi {
   let lastQuote: CheckoutSummary | null = null;
 
   return {
+    async getHomeHeroSlides() {
+      await wait();
+      return [];
+    },
     async getCategories() {
       await wait();
       return mockCategories;

@@ -15,6 +15,7 @@ import type {
   CreateReviewInput,
   CustomerProfile,
   CustomerProfileInput,
+  HomeHeroSlide,
   LoginInput,
   MarketplaceApi,
   OrderConfirmation,
@@ -51,6 +52,14 @@ export class HttpMarketplaceApi implements MarketplaceApi {
 
   constructor(baseUrl: string) {
     this.client = new HttpClient(baseUrl);
+  }
+
+  async getHomeHeroSlides(): Promise<HomeHeroSlide[]> {
+    const slides = await this.client.get<HomeHeroSlide[]>("/home-hero-slides");
+    return slides.map((slide) => ({
+      ...slide,
+      imageUrl: this.assetUrl(slide.imageUrl) ?? slide.imageUrl,
+    }));
   }
 
   async getCategories(): Promise<Category[]> {

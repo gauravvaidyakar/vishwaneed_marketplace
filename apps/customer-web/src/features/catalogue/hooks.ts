@@ -3,12 +3,21 @@ import { marketplaceApi } from '../../api';
 import type { ProductQuery } from '../../api/types';
 
 export const catalogueKeys = {
+  homeHero: ['home-hero-slides'] as const,
   categories: ['categories'] as const,
   products: (query: ProductQuery) => ['products', query] as const,
   product: (idOrSlug: string) => ['product', idOrSlug] as const,
   reviews: (productId: string) => ['product-reviews', productId] as const,
   related: (categoryId: string) => ['related-products', categoryId] as const,
 };
+
+export function useHomeHeroSlides() {
+  return useQuery({
+    queryKey: catalogueKeys.homeHero,
+    queryFn: () => marketplaceApi.getHomeHeroSlides(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
 
 export function useCategories() {
   return useQuery({

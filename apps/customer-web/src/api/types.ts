@@ -32,6 +32,18 @@ export interface Category {
   imageUrl?: string | null;
 }
 
+export interface HomeHeroSlide {
+  id: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  ctaLabel: string;
+  ctaHref: string;
+  imageUrl: string;
+  imageAlt: string;
+  sortOrder: number;
+}
+
 export type ProductType = "RAW_COMMODITY" | "VALUE_ADDED";
 export type StockStatus = "IN_STOCK" | "LOW_STOCK" | "OUT_OF_STOCK";
 
@@ -465,6 +477,7 @@ export interface CustomerNotification {
 }
 
 export interface MarketplaceApi {
+  getHomeHeroSlides(): Promise<HomeHeroSlide[]>;
   getCategories(): Promise<Category[]>;
   getProducts(query: ProductQuery): Promise<Paginated<Product>>;
   getProduct(idOrSlug: string): Promise<Product>;
