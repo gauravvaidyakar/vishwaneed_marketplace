@@ -172,6 +172,7 @@ export const money = (value: unknown) => {
 export const assetUrl = (value?: string | null) => {
   if (!value) return undefined;
   if (/^https?:\/\//i.test(value) || value.startsWith("data:")) return value;
+  if (value.startsWith("/assets/")) return value;
   if (/^https?:\/\//i.test(base)) return new URL(value, base).toString();
   return value;
 };
