@@ -6,6 +6,8 @@ import {
   NotificationStatus,
   ProductStatus,
   Role,
+  UserStatus,
+  VerificationOtpPurpose,
   VendorStatus,
   VendorSuspensionReason,
 } from "@prisma/client";
@@ -64,15 +66,19 @@ describe("platform security rules", () => {
     } as unknown as PrismaService;
     const service = new AuthService(
       prisma,
-      {} as JwtService,
-      {} as ConfigService,
+      { signAsync: vi.fn().mockResolvedValue("opaque-challenge") } as unknown as JwtService,
+      {
+        get: vi.fn((_key: string, fallback?: unknown) => fallback),
+        getOrThrow: vi.fn().mockReturnValue("a-secure-test-secret-that-is-long-enough"),
+      } as unknown as ConfigService,
     );
     await expect(
       service.forgotPassword({ emailOrMobile: "missing@example.com" }),
-    ).resolves.toEqual({
+    ).resolves.toEqual(expect.objectContaining({
       message:
         "If the account exists, reset instructions will be sent securely.",
-    });
+      challengeToken: "opaque-challenge",
+    }));
   });
 
   it("rejects an expired password-reset token", async () => {
@@ -259,6 +265,74 @@ describe("platform security rules", () => {
     expect(verifyUser).not.toHaveBeenCalled();
   });
 
+  it("creates the existing customer session only after the public OTP challenge is verified", async () => {
+    const consumed = vi.fn()
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    const user = {
+      id: "customer-user",
+      email: "customer@example.com",
+      mobile: "9876543210",
+      mobileVerifiedAt: null,
+      passwordHash: await hash("StrongPass1", 12),
+      refreshTokenHash: null,
+      role: Role.CUSTOMER,
+      status: UserStatus.ACTIVE,
+    };
+    const transactionClient = {
+      verificationOtp: { updateMany: consumed },
+      user: { update: vi.fn().mockResolvedValue(user) },
+    };
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue(user),
+        update: vi.fn().mockResolvedValue(user),
+      },
+      customerProfile: {
+        findUniqueOrThrow: vi.fn().mockResolvedValue({
+          id: "customer-profile",
+          firstName: "Customer",
+          lastName: "One",
+        }),
+      },
+      verificationOtp: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "otp-id",
+          codeHash: await hash("123456", 12),
+          expiresAt: new Date(Date.now() + 60_000),
+          attempts: 0,
+        }),
+      },
+      $transaction: vi.fn(
+        (operation: (tx: typeof transactionClient) => Promise<unknown>) =>
+          operation(transactionClient),
+      ),
+    } as unknown as PrismaService;
+    const jwt = {
+      verifyAsync: vi.fn().mockResolvedValue({
+        sub: user.id,
+        type: "customer_account_verification",
+      }),
+      signAsync: vi.fn()
+        .mockResolvedValueOnce("access-token")
+        .mockResolvedValueOnce("refresh-token"),
+    } as unknown as JwtService;
+    const config = {
+      get: vi.fn((_key: string, fallback?: unknown) => fallback),
+      getOrThrow: vi.fn().mockReturnValue("a-secure-test-secret-that-is-long-enough"),
+    } as unknown as ConfigService;
+    const service = new AuthService(prisma, jwt, config);
+
+    await expect(service.verifyCustomerAccountOtp("challenge", "123456"))
+      .resolves.toMatchObject({
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        customer: { id: "customer-profile", mobileVerified: true },
+      });
+    await expect(service.verifyCustomerAccountOtp("challenge", "123456"))
+      .rejects.toThrow("invalid or expired");
+  });
+
   it("counts an invalid one-time-code attempt without exposing the expected code", async () => {
     const update = vi.fn().mockResolvedValue({});
     const prisma = {
@@ -293,7 +367,7 @@ describe("platform security rules", () => {
           vendor: null,
         }),
       },
-      verificationOtp: { create, deleteMany },
+      verificationOtp: { create, deleteMany, findFirst: vi.fn().mockResolvedValue(null) },
       $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     } as unknown as PrismaService;
     const config = {
@@ -321,10 +395,8 @@ describe("platform security rules", () => {
     expect(deliveryPayload.otp).toMatch(/^\d{6}$/);
     expect(storedHash).not.toBe(deliveryPayload.otp);
     await expect(compare(deliveryPayload.otp, storedHash)).resolves.toBe(true);
-    expect(result).toMatchObject({
-      message: "Verification code sent securely",
-      developmentOtp: deliveryPayload.otp,
-    });
+    expect(result).toMatchObject({ message: "Verification code sent securely" });
+    expect(result).not.toHaveProperty("developmentOtp");
   });
 
   it("removes the challenge and reports failure when OTP delivery fails", async () => {
@@ -344,6 +416,7 @@ describe("platform security rules", () => {
       verificationOtp: {
         create: vi.fn().mockResolvedValue({}),
         deleteMany,
+        findFirst: vi.fn().mockResolvedValue(null),
       },
       $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     } as unknown as PrismaService;
@@ -363,7 +436,13 @@ describe("platform security rules", () => {
     await expect(service.requestVerificationOtp("user-id")).rejects.toThrow(
       "could not be delivered",
     );
-    expect(deleteMany).toHaveBeenLastCalledWith({ where: { userId: "user-id" } });
+    expect(deleteMany).toHaveBeenLastCalledWith({
+      where: {
+        userId: "user-id",
+        purpose: VerificationOtpPurpose.ACCOUNT_VERIFICATION,
+        consumedAt: null,
+      },
+    });
   });
 
   it("requires independent strong JWT secrets and field encryption", () => {

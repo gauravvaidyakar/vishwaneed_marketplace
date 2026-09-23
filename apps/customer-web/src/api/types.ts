@@ -139,6 +139,18 @@ export interface AuthSession {
   customer: Customer;
 }
 
+export interface CustomerOtpChallenge {
+  verificationRequired: true;
+  challengeToken: string;
+  maskedDestination: string;
+  message: string;
+  expiresInMinutes: number;
+  resendAfterSeconds: number;
+  verified?: boolean;
+}
+
+export type CustomerAuthResult = AuthSession | CustomerOtpChallenge;
+
 export interface LoginInput {
   emailOrMobile: string;
   password: string;
@@ -158,14 +170,21 @@ export interface ResetPasswordInput {
 
 export interface PasswordResetRequestResult {
   message: string;
+  challengeToken: string;
+  maskedDestination: string;
+  resendAfterSeconds: number;
   developmentResetUrl?: string;
+}
+
+export interface PasswordResetOtpResult {
+  message: string;
+  resetToken: string;
 }
 
 export interface VerificationOtpResult {
   message: string;
   verified?: boolean;
   expiresInMinutes?: number;
-  developmentOtp?: string;
 }
 
 export interface CartLine {
@@ -482,11 +501,14 @@ export interface MarketplaceApi {
   getProducts(query: ProductQuery): Promise<Paginated<Product>>;
   getProduct(idOrSlug: string): Promise<Product>;
   getProductReviews(productId: string): Promise<PublicReview[]>;
-  login(input: LoginInput): Promise<AuthSession>;
-  register(input: RegisterInput): Promise<AuthSession>;
+  login(input: LoginInput): Promise<CustomerAuthResult>;
+  register(input: RegisterInput): Promise<CustomerAuthResult>;
   logout(): Promise<void>;
   forgotPassword(emailOrMobile: string): Promise<PasswordResetRequestResult>;
   resetPassword(input: ResetPasswordInput): Promise<void>;
+  resendCustomerOtp(challengeToken: string): Promise<CustomerOtpChallenge>;
+  verifyCustomerOtp(challengeToken: string, code: string): Promise<AuthSession>;
+  verifyPasswordResetOtp(challengeToken: string, code: string): Promise<PasswordResetOtpResult>;
   requestVerificationOtp(): Promise<VerificationOtpResult>;
   verifyOtp(code: string): Promise<VerificationOtpResult>;
   getCart(): Promise<Cart>;

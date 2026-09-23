@@ -16,11 +16,13 @@ import { AuthService } from "./auth.service";
 import {
   ForgotPasswordDto,
   ChangeVendorPasswordDto,
+  CustomerOtpChallengeDto,
   LoginDto,
   RefreshDto,
   RegisterDto,
   ResetPasswordDto,
   VerifyOtpDto,
+  VerifyCustomerOtpDto,
 } from "./auth.dto";
 import { JwtAuthGuard } from "./jwt-auth.guard";
 import { Throttle } from "@nestjs/throttler";
@@ -57,6 +59,24 @@ export class AuthController {
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   resetPassword(@Body() input: ResetPasswordDto) {
     return this.auth.resetPassword(input);
+  }
+  @Post("customer/otp/resend")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 3 } })
+  resendCustomerOtp(@Body() input: CustomerOtpChallengeDto) {
+    return this.auth.resendCustomerOtp(input.challengeToken);
+  }
+  @Post("customer/otp/verify")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  verifyCustomerOtp(@Body() input: VerifyCustomerOtpDto) {
+    return this.auth.verifyCustomerAccountOtp(input.challengeToken, input.code);
+  }
+  @Post("customer/password-reset/verify-otp")
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
+  verifyCustomerPasswordResetOtp(@Body() input: VerifyCustomerOtpDto) {
+    return this.auth.verifyPasswordResetOtp(input.challengeToken, input.code);
   }
   @Post("request-verification-otp")
   @HttpCode(HttpStatus.OK)

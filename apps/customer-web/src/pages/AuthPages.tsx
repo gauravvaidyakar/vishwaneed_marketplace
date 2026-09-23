@@ -1,12 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, CheckCircle2, LockKeyhole } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { marketplaceApi, runtimeConfig } from '../api';
 import { getErrorMessage } from '../api/errors';
 import { useAuth } from '../auth/AuthProvider';
+import { otpChallengeStorage } from '../auth/otpChallengeStorage';
+import { OtpInput } from '../components/auth/OtpInput';
 import { FormField } from '../components/ui/FormField';
 
 const loginSchema = z.object({ emailOrMobile: z.string().min(5, 'Enter your email or mobile number.'), password: z.string().min(8, 'Password must be at least 8 characters.') });
@@ -35,12 +37,13 @@ export function LoginPage() {
   const { isAuthenticated, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const destination = (location.state as { from?: string } | null)?.from ?? '/account';
+  const locationState = location.state as { from?: string; notice?: string } | null;
+  const destination = locationState?.from ?? '/account';
   const [serverError, setServerError] = useState('');
   const form = useForm<LoginForm>({ resolver: zodResolver(loginSchema), defaultValues: { emailOrMobile: '', password: '' } });
   if (isAuthenticated) return <Navigate to={destination} replace />;
-  const submit = form.handleSubmit(async (values) => { try { setServerError(''); await login(values); void navigate(destination, { replace: true }); } catch (error) { setServerError(getErrorMessage(error)); } });
-  return <AuthShell title="Welcome back" intro="Sign in to continue to your account and checkout."><form className="stack-form" onSubmit={(event) => void submit(event)} noValidate><FormField label="Email or mobile" autoComplete="username" registration={form.register('emailOrMobile')} error={form.formState.errors.emailOrMobile} /><FormField label="Password" type="password" autoComplete="current-password" registration={form.register('password')} error={form.formState.errors.password} />{serverError && <p className="form-error" role="alert">{serverError}</p>}<div className="form-row-between"><span>Secure customer session</span><Link to="/forgot-password">Forgot password?</Link></div><button className="button button--primary button--full" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}</button></form><p className="auth-switch">New to Vishwaneed? <Link to="/register">Create an account</Link></p></AuthShell>;
+  const submit = form.handleSubmit(async (values) => { try { setServerError(''); const result = await login(values); if ('verificationRequired' in result) { otpChallengeStorage.set(result); void navigate('/verify-account', { replace: true }); return; } void navigate(destination, { replace: true }); } catch (error) { setServerError(getErrorMessage(error)); } });
+  return <AuthShell title="Welcome back" intro="Sign in to continue to your account and checkout."><form className="stack-form" onSubmit={(event) => void submit(event)} noValidate>{locationState?.notice && <p className="form-success" role="status">{locationState.notice}</p>}<FormField label="Email or mobile" autoComplete="username" registration={form.register('emailOrMobile')} error={form.formState.errors.emailOrMobile} /><FormField label="Password" type="password" autoComplete="current-password" registration={form.register('password')} error={form.formState.errors.password} />{serverError && <p className="form-error" role="alert">{serverError}</p>}<div className="form-row-between"><span>Secure customer session</span><Link to="/forgot-password">Forgot password?</Link></div><button className="button button--primary button--full" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? 'Signing in…' : 'Sign in'}</button></form><p className="auth-switch">New to Vishwaneed? <Link to="/register">Create an account</Link></p></AuthShell>;
 }
 
 export function RegisterPage() {
@@ -49,17 +52,41 @@ export function RegisterPage() {
   const [serverError, setServerError] = useState('');
   const form = useForm<RegisterForm>({ resolver: zodResolver(registerSchema), defaultValues: { name: '', email: '', mobile: '', password: '', acceptTerms: false } });
   if (isAuthenticated) return <Navigate to="/account" replace />;
-  const submit = form.handleSubmit(async (values) => { try { setServerError(''); const input = { name: values.name, email: values.email, mobile: values.mobile, password: values.password }; await register(input); void navigate('/verify-mobile', { replace: true }); } catch (error) { setServerError(getErrorMessage(error)); } });
+  const submit = form.handleSubmit(async (values) => { try { setServerError(''); const input = { name: values.name, email: values.email, mobile: values.mobile, password: values.password }; const result = await register(input); if ('verificationRequired' in result) { otpChallengeStorage.set(result); void navigate('/verify-account', { replace: true }); return; } void navigate('/account', { replace: true }); } catch (error) { setServerError(getErrorMessage(error)); } });
   return <AuthShell title="Create your account" intro="Register as a customer to save addresses and check out."><form className="stack-form" onSubmit={(event) => void submit(event)} noValidate><FormField label="Full name" autoComplete="name" registration={form.register('name')} error={form.formState.errors.name} /><FormField label="Email" type="email" autoComplete="email" registration={form.register('email')} error={form.formState.errors.email} /><FormField label="Mobile" inputMode="numeric" autoComplete="tel" registration={form.register('mobile')} error={form.formState.errors.mobile} /><FormField label="Password" type="password" autoComplete="new-password" hint="At least 10 characters, with an uppercase letter and number." registration={form.register('password')} error={form.formState.errors.password} /><label className="checkbox-field"><input type="checkbox" {...form.register('acceptTerms')} /> I agree to the customer terms and privacy policy.</label>{form.formState.errors.acceptTerms && <small className="field-error">{form.formState.errors.acceptTerms.message}</small>}{serverError && <p className="form-error" role="alert">{serverError}</p>}<button className="button button--primary button--full" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? 'Creating account…' : 'Create account'}</button></form><p className="auth-switch">Already registered? <Link to="/login">Sign in</Link></p></AuthShell>;
 }
 
 export function ForgotPasswordPage() {
-  const [sent, setSent] = useState(false);
-  const [developmentResetUrl, setDevelopmentResetUrl] = useState('');
+  const navigate = useNavigate();
+  const [step, setStep] = useState<'request' | 'otp' | 'password'>('request');
+  const [challengeToken, setChallengeToken] = useState('');
+  const [maskedDestination, setMaskedDestination] = useState('');
+  const [code, setCode] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [notice, setNotice] = useState('');
   const form = useForm<ForgotForm>({ resolver: zodResolver(forgotSchema), defaultValues: { emailOrMobile: '' } });
-  const submit = form.handleSubmit(async ({ emailOrMobile }) => { try { setServerError(''); const result = await marketplaceApi.forgotPassword(emailOrMobile); setDevelopmentResetUrl(result.developmentResetUrl ?? ''); setSent(true); } catch (error) { setServerError(getErrorMessage(error)); } });
-  return <AuthShell title="Reset your password" intro="We’ll ask the backend to send the configured reset instructions.">{sent ? <div className="success-message"><CheckCircle2 /><h3>Request received</h3><p>If the account exists, reset instructions will be sent securely.</p>{developmentResetUrl && <a className="button button--primary" href={developmentResetUrl}>Open development reset link</a>}<Link className="button button--secondary" to="/login">Return to sign in</Link></div> : <form className="stack-form" onSubmit={(event) => void submit(event)} noValidate><FormField label="Email or mobile" registration={form.register('emailOrMobile')} error={form.formState.errors.emailOrMobile} />{serverError && <p className="form-error" role="alert">{serverError}</p>}<button className="button button--primary button--full" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? 'Sending…' : 'Send reset instructions'}</button></form>}</AuthShell>;
+  const resetForm = useForm<ResetForm>({ resolver: zodResolver(resetSchema), defaultValues: { password: '', confirmPassword: '' } });
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setInterval(() => setCooldown((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
+
+  const request = form.handleSubmit(async ({ emailOrMobile }) => { try { setBusy(true); setServerError(''); const result = await marketplaceApi.forgotPassword(emailOrMobile); setChallengeToken(result.challengeToken); setMaskedDestination(result.maskedDestination); setCooldown(result.resendAfterSeconds); setStep('otp'); } catch (error) { setServerError(getErrorMessage(error)); } finally { setBusy(false); } });
+  const verify = async (event: React.FormEvent) => { event.preventDefault(); if (!/^\d{6}$/.test(code)) { setServerError('Enter the complete 6-digit verification code.'); return; } try { setBusy(true); setServerError(''); const result = await marketplaceApi.verifyPasswordResetOtp(challengeToken, code); setResetToken(result.resetToken); setStep('password'); } catch (error) { setCode(''); setServerError(getErrorMessage(error)); } finally { setBusy(false); } };
+  const resend = async () => { try { setBusy(true); setServerError(''); setNotice(''); const result = await marketplaceApi.resendCustomerOtp(challengeToken); setChallengeToken(result.challengeToken); setMaskedDestination(result.maskedDestination); setCooldown(result.resendAfterSeconds); setCode(''); setNotice('A new verification code was sent.'); } catch (error) { setServerError(getErrorMessage(error)); } finally { setBusy(false); } };
+  const updatePassword = resetForm.handleSubmit(async ({ password }) => { try { setServerError(''); await marketplaceApi.resetPassword({ token: resetToken, password }); void navigate('/login', { replace: true, state: { notice: 'Password updated. Sign in with your new password.' } }); } catch (error) { setServerError(getErrorMessage(error)); } });
+
+  return <AuthShell title="Reset your password" intro={step === 'request' ? 'Verify your registered mobile before choosing a new password.' : step === 'otp' ? `Enter the code sent to ${maskedDestination}.` : 'Choose a strong new password for your account.'}>
+    {step === 'request' && <form className="stack-form" onSubmit={(event) => void request(event)} noValidate><FormField label="Email or mobile" autoComplete="username" registration={form.register('emailOrMobile')} error={form.formState.errors.emailOrMobile} />{serverError && <p className="form-error" role="alert">{serverError}</p>}<button className="button button--primary button--full" disabled={busy}>{busy ? 'Sending…' : 'Send verification code'}</button></form>}
+    {step === 'otp' && <form className="stack-form" onSubmit={(event) => void verify(event)}><span className="otp-label">6-digit verification code</span><OtpInput value={code} onChange={setCode} disabled={busy} />{notice && <p className="form-success" role="status">{notice}</p>}{serverError && <p className="form-error" role="alert">{serverError}</p>}<button className="button button--primary button--full" disabled={busy || code.length !== 6}>{busy ? 'Verifying…' : 'Verify code'}</button><div className="otp-resend"><span>Didn’t receive it?</span><button className="link-button" type="button" disabled={busy || cooldown > 0} onClick={() => void resend()}>{cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}</button></div></form>}
+    {step === 'password' && <form className="stack-form" onSubmit={(event) => void updatePassword(event)} noValidate><FormField label="New password" type="password" autoComplete="new-password" hint="At least 10 characters, with an uppercase letter and number." registration={resetForm.register('password')} error={resetForm.formState.errors.password} /><FormField label="Confirm new password" type="password" autoComplete="new-password" registration={resetForm.register('confirmPassword')} error={resetForm.formState.errors.confirmPassword} />{serverError && <p className="form-error" role="alert">{serverError}</p>}<button className="button button--primary button--full" disabled={resetForm.formState.isSubmitting}>{resetForm.formState.isSubmitting ? 'Updating…' : 'Update password'}</button></form>}
+    <p className="auth-switch"><Link to="/login">Return to sign in</Link></p>
+  </AuthShell>;
 }
 
 export function ResetPasswordPage() {

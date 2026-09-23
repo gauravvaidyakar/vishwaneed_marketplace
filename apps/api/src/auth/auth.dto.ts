@@ -79,3 +79,13 @@ export class VerifyOtpDto {
   @Matches(/^\d{6}$/, { message: "OTP must contain exactly 6 digits" })
   code!: string;
 }
+
+export class CustomerOtpChallengeDto {
+  @IsString() @IsNotEmpty() challengeToken!: string;
+}
+
+export class VerifyCustomerOtpDto extends CustomerOtpChallengeDto {
+  @IsString()
+  @Matches(/^\d{6}$/, { message: "OTP must contain exactly 6 digits" })
+  code!: string;
+}

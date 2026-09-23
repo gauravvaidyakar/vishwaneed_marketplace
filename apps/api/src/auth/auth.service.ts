@@ -2,6 +2,8 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  HttpException,
+  HttpStatus,
   Injectable,
   Optional,
   ServiceUnavailableException,
@@ -14,10 +16,11 @@ import {
   Prisma,
   Role,
   UserStatus,
+  VerificationOtpPurpose,
   type User,
 } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
-import { createHash, randomBytes, randomInt } from "node:crypto";
+import { createHash, randomBytes, randomInt, randomUUID } from "node:crypto";
 import { PrismaService } from "../database/prisma.service";
 import { NotificationsService } from "../notifications/notifications.service";
 import type {
@@ -33,6 +36,11 @@ import type {
 interface Tokens {
   accessToken: string;
   refreshToken: string;
+}
+
+interface OtpChallengePayload {
+  sub: string;
+  type: "customer_account_verification" | "customer_password_reset";
 }
 
 @Injectable()
@@ -108,7 +116,11 @@ export class AuthService {
       }
       return created;
     });
-    return this.createSession(user);
+    if (user.role !== Role.CUSTOMER) return this.createSession(user);
+    return this.createCustomerOtpChallenge(
+      user,
+      VerificationOtpPurpose.ACCOUNT_VERIFICATION,
+    );
   }
 
   async login(input: LoginDto): Promise<Record<string, unknown>> {
@@ -122,6 +134,12 @@ export class AuthService {
       throw new UnauthorizedException("Invalid credentials");
     if (user.status !== UserStatus.ACTIVE)
       throw new UnauthorizedException("Account is not active");
+    if (user.role === Role.CUSTOMER && !user.mobileVerifiedAt) {
+      return this.createCustomerOtpChallenge(
+        user,
+        VerificationOtpPurpose.ACCOUNT_VERIFICATION,
+      );
+    }
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
@@ -170,7 +188,38 @@ export class AuthService {
         OR: [{ email: identifier.toLowerCase() }, { mobile: identifier }],
       },
     });
-    if (!user || user.status !== UserStatus.ACTIVE) return genericResponse;
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      return {
+        ...genericResponse,
+        challengeToken: await this.signOtpChallenge(
+          randomUUID(),
+          "customer_password_reset",
+        ),
+        maskedDestination: this.maskIdentifier(identifier),
+        resendAfterSeconds: this.otpCooldownSeconds(),
+      };
+    }
+
+    if (user.role === Role.CUSTOMER) {
+      try {
+        const challenge = await this.createCustomerOtpChallenge(
+          user,
+          VerificationOtpPurpose.PASSWORD_RESET,
+        );
+        return { ...genericResponse, ...challenge };
+      } catch {
+        // Keep the public response indistinguishable to prevent account enumeration.
+        return {
+          ...genericResponse,
+          challengeToken: await this.signOtpChallenge(
+            user.id,
+            "customer_password_reset",
+          ),
+          maskedDestination: this.maskIdentifier(identifier),
+          resendAfterSeconds: this.otpCooldownSeconds(),
+        };
+      }
+    }
 
     const token = randomBytes(32).toString("hex");
     const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -247,68 +296,22 @@ export class AuthService {
       );
     }
 
-    const code = randomInt(100_000, 1_000_000).toString();
-    const codeHash = await hash(code, 12);
-    const ttlMinutes = Math.max(
-      5,
-      Number(this.config.get<string>("OTP_TTL_MINUTES", "10")),
+    const result = await this.issueOtp(
+      { ...user, mobile: user.mobile ?? user.vendor?.businessMobile ?? null },
+      VerificationOtpPurpose.ACCOUNT_VERIFICATION,
     );
-    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
-    await this.prisma.$transaction([
-      this.prisma.verificationOtp.deleteMany({ where: { userId } }),
-      this.prisma.verificationOtp.create({
-        data: { userId, codeHash, expiresAt },
-      }),
-    ]);
-    const delivery = await this.notifications?.sendWhatsApp(
-      userId,
-      "account_verification_otp",
-      { expiresInMinutes: ttlMinutes },
-      `account:${userId}:verification:${expiresAt.toISOString()}`,
-      { otp: code, expiresInMinutes: ttlMinutes },
-    );
-    if (
-      this.notifications &&
-      (!delivery || delivery.status !== NotificationStatus.SENT)
-    ) {
-      await this.prisma.verificationOtp.deleteMany({ where: { userId } });
-      throw new ServiceUnavailableException(
-        "Verification code could not be delivered. Please try again later.",
-      );
-    }
-
-    const response: Record<string, unknown> = {
-      message: "Verification code sent securely",
-      expiresInMinutes: ttlMinutes,
-    };
-    if (this.config.get<string>("NODE_ENV", "development") !== "production") {
-      response.developmentOtp = code;
-    }
-    return response;
+    return { message: "Verification code sent securely", ...result };
   }
 
   async verifyOtp(
     userId: string,
     input: VerifyOtpDto,
   ): Promise<{ message: string; verified: true }> {
-    const challenge = await this.prisma.verificationOtp.findFirst({
-      where: { userId, consumedAt: null },
-      orderBy: { createdAt: "desc" },
-    });
-    if (
-      !challenge ||
-      challenge.expiresAt.getTime() <= Date.now() ||
-      challenge.attempts >= 5
-    ) {
-      throw new BadRequestException("Verification code is invalid or expired");
-    }
-    if (!(await compare(input.code, challenge.codeHash))) {
-      await this.prisma.verificationOtp.update({
-        where: { id: challenge.id },
-        data: { attempts: { increment: 1 } },
-      });
-      throw new BadRequestException("Verification code is invalid or expired");
-    }
+    const challenge = await this.validateOtp(
+      userId,
+      VerificationOtpPurpose.ACCOUNT_VERIFICATION,
+      input.code,
+    );
     const verifiedAt = new Date();
     await this.prisma.$transaction(async (tx) => {
       const consumed = await tx.verificationOtp.updateMany({
@@ -324,6 +327,82 @@ export class AuthService {
       });
     });
     return { message: "Mobile number verified successfully", verified: true };
+  }
+
+  async resendCustomerOtp(challengeToken: string) {
+    const payload = await this.verifyOtpChallenge(challengeToken);
+    const purpose = payload.type === "customer_password_reset"
+      ? VerificationOtpPurpose.PASSWORD_RESET
+      : VerificationOtpPurpose.ACCOUNT_VERIFICATION;
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || user.role !== Role.CUSTOMER || user.status !== UserStatus.ACTIVE) {
+      throw new BadRequestException("Verification request is invalid or expired");
+    }
+    if (purpose === VerificationOtpPurpose.ACCOUNT_VERIFICATION && user.mobileVerifiedAt) {
+      throw new BadRequestException("Account is already verified. Please sign in.");
+    }
+    const result = await this.issueOtp(user, purpose);
+    return {
+      message: "A new verification code was sent securely",
+      challengeToken: await this.signOtpChallenge(payload.sub, payload.type),
+      maskedDestination: this.maskMobile(user.mobile),
+      ...result,
+    };
+  }
+
+  async verifyCustomerAccountOtp(challengeToken: string, code: string) {
+    const payload = await this.verifyOtpChallenge(challengeToken, "customer_account_verification");
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || user.role !== Role.CUSTOMER || user.status !== UserStatus.ACTIVE) {
+      throw new BadRequestException("Verification code is invalid or expired");
+    }
+    const challenge = await this.validateOtp(
+      user.id,
+      VerificationOtpPurpose.ACCOUNT_VERIFICATION,
+      code,
+    );
+    const verifiedAt = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const consumed = await tx.verificationOtp.updateMany({
+        where: { id: challenge.id, consumedAt: null },
+        data: { consumedAt: verifiedAt },
+      });
+      if (consumed.count !== 1) throw new BadRequestException("Verification code is invalid or expired");
+      await tx.user.update({
+        where: { id: user.id },
+        data: { mobileVerifiedAt: verifiedAt, lastLoginAt: verifiedAt },
+      });
+    });
+    return this.createSession({ ...user, mobileVerifiedAt: verifiedAt });
+  }
+
+  async verifyPasswordResetOtp(challengeToken: string, code: string) {
+    const payload = await this.verifyOtpChallenge(challengeToken, "customer_password_reset");
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || user.role !== Role.CUSTOMER || user.status !== UserStatus.ACTIVE) {
+      throw new BadRequestException("Verification code is invalid or expired");
+    }
+    const challenge = await this.validateOtp(
+      user.id,
+      VerificationOtpPurpose.PASSWORD_RESET,
+      code,
+    );
+    const token = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+    const expiresAt = new Date(Date.now() + 15 * 60_000);
+    await this.prisma.$transaction(async (tx) => {
+      const consumed = await tx.verificationOtp.updateMany({
+        where: { id: challenge.id, consumedAt: null },
+        data: { consumedAt: new Date() },
+      });
+      if (consumed.count !== 1) throw new BadRequestException("Verification code is invalid or expired");
+      await tx.passwordResetToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+      await tx.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } });
+    });
+    return { message: "Verification successful", resetToken: token };
   }
 
   async changeVendorPassword(
@@ -361,6 +440,151 @@ export class AuthService {
       message: "Password changed successfully. Please sign in again.",
       requiresReauthentication: true,
     };
+  }
+
+  private async createCustomerOtpChallenge(
+    user: User,
+    purpose: VerificationOtpPurpose,
+  ): Promise<Record<string, unknown>> {
+    const result = await this.issueOtp(user, purpose);
+    const type: OtpChallengePayload["type"] =
+      purpose === VerificationOtpPurpose.PASSWORD_RESET
+        ? "customer_password_reset"
+        : "customer_account_verification";
+    return {
+      verificationRequired: true,
+      challengeToken: await this.signOtpChallenge(user.id, type),
+      maskedDestination: this.maskMobile(user.mobile),
+      message: "Verification code sent securely",
+      ...result,
+    };
+  }
+
+  private async issueOtp(user: User, purpose: VerificationOtpPurpose) {
+    if (!user.mobile) {
+      throw new ServiceUnavailableException(
+        "OTP delivery requires a registered mobile number",
+      );
+    }
+    const cooldownSeconds = this.otpCooldownSeconds();
+    const latest = await this.prisma.verificationOtp.findFirst({
+      where: { userId: user.id, purpose, consumedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { createdAt: true },
+    });
+    if (latest) {
+      const remaining = cooldownSeconds - Math.floor((Date.now() - latest.createdAt.getTime()) / 1000);
+      if (remaining > 0) {
+        throw new HttpException(
+          `Please wait ${remaining} seconds before requesting another code`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    const code = randomInt(100_000, 1_000_000).toString();
+    const codeHash = await hash(code, 12);
+    const ttlMinutes = Math.max(5, Number(this.config.get<string>("OTP_TTL_MINUTES", "5")));
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+    await this.prisma.$transaction([
+      this.prisma.verificationOtp.deleteMany({
+        where: { userId: user.id, purpose, consumedAt: null },
+      }),
+      this.prisma.verificationOtp.create({
+        data: { userId: user.id, purpose, codeHash, expiresAt },
+      }),
+    ]);
+    const template = purpose === VerificationOtpPurpose.PASSWORD_RESET
+      ? "password_reset_otp"
+      : "customer_registration_otp";
+    const delivery = await this.notifications?.sendWhatsApp(
+      user.id,
+      template,
+      { expiresInMinutes: ttlMinutes },
+      undefined,
+      { otp: code, expiresInMinutes: ttlMinutes },
+    );
+    if (!delivery || delivery.status !== NotificationStatus.SENT) {
+      await this.prisma.verificationOtp.deleteMany({
+        where: { userId: user.id, purpose, consumedAt: null },
+      });
+      throw new ServiceUnavailableException(
+        "Verification code could not be delivered. Please try again later.",
+      );
+    }
+    return {
+      expiresInMinutes: ttlMinutes,
+      resendAfterSeconds: cooldownSeconds,
+    };
+  }
+
+  private async validateOtp(
+    userId: string,
+    purpose: VerificationOtpPurpose,
+    code: string,
+  ) {
+    const challenge = await this.prisma.verificationOtp.findFirst({
+      where: { userId, purpose, consumedAt: null },
+      orderBy: { createdAt: "desc" },
+    });
+    if (!challenge || challenge.expiresAt.getTime() <= Date.now() || challenge.attempts >= 5) {
+      throw new BadRequestException("Verification code is invalid or expired");
+    }
+    if (!(await compare(code, challenge.codeHash))) {
+      await this.prisma.verificationOtp.update({
+        where: { id: challenge.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new BadRequestException("Verification code is invalid or expired");
+    }
+    return challenge;
+  }
+
+  private async signOtpChallenge(userId: string, type: OtpChallengePayload["type"]) {
+    return this.jwt.signAsync(
+      { sub: userId, type },
+      {
+        secret: this.config.getOrThrow<string>("JWT_ACCESS_SECRET"),
+        expiresIn: "15m",
+      },
+    );
+  }
+
+  private async verifyOtpChallenge(
+    token: string,
+    expectedType?: OtpChallengePayload["type"],
+  ): Promise<OtpChallengePayload> {
+    try {
+      const payload = await this.jwt.verifyAsync<OtpChallengePayload>(token, {
+        secret: this.config.getOrThrow<string>("JWT_ACCESS_SECRET"),
+      });
+      if (
+        !["customer_account_verification", "customer_password_reset"].includes(payload.type) ||
+        (expectedType && payload.type !== expectedType)
+      ) {
+        throw new Error("wrong challenge type");
+      }
+      return payload;
+    } catch {
+      throw new BadRequestException("Verification request is invalid or expired");
+    }
+  }
+
+  private otpCooldownSeconds() {
+    return Math.max(30, Number(this.config.get<string>("OTP_RESEND_COOLDOWN_SECONDS", "30")));
+  }
+
+  private maskMobile(mobile?: string | null) {
+    if (!mobile) return "your registered contact";
+    return `******${mobile.replace(/\D/g, "").slice(-4)}`;
+  }
+
+  private maskIdentifier(identifier: string) {
+    if (identifier.includes("@")) {
+      const [name, domain] = identifier.split("@");
+      return `${name.slice(0, 2)}***@${domain ?? ""}`;
+    }
+    return this.maskMobile(identifier);
   }
 
   private async createSession(user: User): Promise<Record<string, unknown>> {

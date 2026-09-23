@@ -368,6 +368,7 @@ h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.12; }
 .cart-line-price span { color: var(--muted); font-size: .68rem; }
 .cart-line-price button { margin-top: auto; border: 0; background: none; color: var(--danger); padding: 6px; }
 .inline-error, .form-error, .field-error { color: var(--danger); font-size: .76rem; }
+.form-success { margin: 0; color: var(--green-800); font-size: .76rem; font-weight: 700; }
 .product-notice { min-height: 1.2rem; margin: 8px 0 0; color: var(--forest); font-size: .78rem; }
 .shipping-pending { display: flex; justify-content: space-between; gap: 14px; padding: 12px 14px; border-radius: 10px; background: #f3f5ef; font-size: .73rem; }
 .order-summary { position: sticky; top: 148px; }
@@ -411,6 +412,19 @@ h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.12; }
 .mock-note { margin-top: 20px; padding: 11px; border-radius: 9px; background: #fff5d9; color: #6c520e; font-size: .7rem; line-height: 1.45; }
 .success-message { text-align: center; padding-block: 25px; }
 .success-message > svg { width: 50px; height: 50px; color: var(--green-800); }
+.verification-page { min-height: 70vh; display: grid; place-items: center; }
+.auth-form-card { width: min(520px, 100%); padding: 36px; border: 1px solid var(--line); border-radius: 22px; background: white; box-shadow: var(--shadow); }
+.auth-form-card > svg { width: 42px; height: 42px; margin-bottom: 12px; color: var(--green-800); }
+.auth-form-card h1 { margin: 8px 0; font-size: clamp(2rem, 5vw, 3rem); }
+.auth-form-card > p { color: var(--muted); line-height: 1.6; }
+.otp-label { color: #39443d; font-size: .8rem; font-weight: 700; }
+.otp-input { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.otp-input input { width: 100%; aspect-ratio: 1; min-width: 0; border: 1px solid var(--line); border-radius: 11px; background: #fff; color: var(--ink); font-size: 1.35rem; font-weight: 800; text-align: center; outline: none; }
+.otp-input input:focus { border-color: var(--green-800); box-shadow: 0 0 0 3px rgba(32,97,58,.11); }
+.otp-resend { display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); font-size: .78rem; }
+.link-button { border: 0; padding: 0; background: none; color: var(--green-800); font: inherit; font-weight: 800; cursor: pointer; }
+.link-button:disabled { color: var(--muted); cursor: not-allowed; }
+.otp-help { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 18px 0; font-size: .75rem; }
 
 .account-grid { display: grid; grid-template-columns: 300px 1fr; gap: 22px; }
 .account-profile { padding: 30px; text-align: center; background: white; border: 1px solid var(--line); border-radius: 18px; }
@@ -767,6 +781,8 @@ h2 { font-size: clamp(1.8rem, 3vw, 2.7rem); line-height: 1.12; }
   .back-link--light { left: 28px; }
   .auth-panel { padding: 28px 14px 45px; }
   .auth-card { padding: 24px; }
+  .auth-form-card { padding: 24px 18px; }
+  .otp-input { gap: 6px; }
   .account-grid, .address-grid { grid-template-columns: 1fr; }
   .address-form { grid-template-columns: 1fr; }
   .form-span { grid-column: auto; }

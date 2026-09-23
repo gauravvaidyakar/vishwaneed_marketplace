@@ -142,23 +142,37 @@ export function createMockMarketplaceApi(): MarketplaceApi {
       if (!input.password) throw new ApiError('Password is required.', 422, 'VALIDATION_ERROR');
       return { accessToken: 'mock-customer-access-token', customer: { id: 'customer-demo', name: 'Demo Customer', email: input.emailOrMobile.includes('@') ? input.emailOrMobile : undefined, mobile: input.emailOrMobile.includes('@') ? undefined : input.emailOrMobile, role: 'CUSTOMER' } };
     },
-    async register(input: RegisterInput): Promise<AuthSession> {
+    async register(input: RegisterInput) {
       await wait();
-      return { accessToken: 'mock-customer-access-token', customer: { id: crypto.randomUUID(), name: input.name, email: input.email, mobile: input.mobile, role: 'CUSTOMER' } };
+      return { verificationRequired: true as const, challengeToken: 'mock-account-challenge', maskedDestination: `******${input.mobile.slice(-4)}`, message: 'Verification code sent securely', expiresInMinutes: 5, resendAfterSeconds: 30 };
     },
     async logout() {
       await wait();
     },
     async forgotPassword() {
       await wait();
-      return { message: 'If the account exists, reset instructions will be sent securely.' };
+      return { message: 'If the account exists, a verification code will be sent securely.', challengeToken: 'mock-reset-challenge', maskedDestination: '******3210', resendAfterSeconds: 30 };
     },
     async resetPassword() {
       await wait();
     },
+    async resendCustomerOtp(challengeToken: string) {
+      await wait();
+      return { verificationRequired: true, challengeToken, maskedDestination: '******3210', message: 'A new verification code was sent securely', expiresInMinutes: 5, resendAfterSeconds: 30 };
+    },
+    async verifyCustomerOtp(_challengeToken: string, code: string): Promise<AuthSession> {
+      await wait();
+      if (code !== '123456') throw new ApiError('Verification code is invalid or expired', 400, 'INVALID_OTP');
+      return { accessToken: 'mock-customer-access-token', refreshToken: 'mock-refresh-token', customer: { id: 'customer-demo', name: 'Demo Customer', mobile: '9876543210', mobileVerified: true, role: 'CUSTOMER' } };
+    },
+    async verifyPasswordResetOtp(_challengeToken: string, code: string) {
+      await wait();
+      if (code !== '123456') throw new ApiError('Verification code is invalid or expired', 400, 'INVALID_OTP');
+      return { message: 'Verification successful', resetToken: 'mock-reset-token' };
+    },
     async requestVerificationOtp() {
       await wait();
-      return { message: "Verification code sent securely", developmentOtp: "123456" };
+      return { message: "Verification code sent securely" };
     },
     async verifyOtp(code: string) {
       await wait();

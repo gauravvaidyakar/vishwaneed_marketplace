@@ -44,6 +44,8 @@ export function validateEnvironment(input: Environment): Environment {
     CHECKOUT_QUOTE_TTL_MINUTES: input.CHECKOUT_QUOTE_TTL_MINUTES ?? "10",
     PASSWORD_RESET_TTL_MINUTES: input.PASSWORD_RESET_TTL_MINUTES ?? "30",
     OTP_TTL_MINUTES: input.OTP_TTL_MINUTES ?? "10",
+    OTP_RESEND_COOLDOWN_SECONDS:
+      input.OTP_RESEND_COOLDOWN_SECONDS ?? "30",
     CUSTOMER_WEB_URL: customerWebUrl,
     VENDOR_WEB_URL:
       input.VENDOR_WEB_URL ??

@@ -2,19 +2,24 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { marketplaceApi } from '../api';
-import type { AuthSession, LoginInput, RegisterInput } from '../api/types';
+import type { AuthSession, CustomerAuthResult, LoginInput, RegisterInput } from '../api/types';
 import { AUTH_EXPIRED_EVENT, sessionStorage } from './sessionStorage';
 
 interface AuthContextValue {
   session: AuthSession | null;
   isAuthenticated: boolean;
-  login(input: LoginInput): Promise<void>;
-  register(input: RegisterInput): Promise<void>;
+  login(input: LoginInput): Promise<CustomerAuthResult>;
+  register(input: RegisterInput): Promise<CustomerAuthResult>;
+  completeOtp(session: AuthSession): Promise<void>;
   logout(): Promise<void>;
   updateCustomer(customer: AuthSession['customer']): void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function isSession(result: CustomerAuthResult): result is AuthSession {
+  return 'accessToken' in result;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
@@ -34,12 +39,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: Boolean(session),
     async login(input) {
       const next = await marketplaceApi.login(input);
-      sessionStorage.set(next);
-      setSession(next);
-      await queryClient.invalidateQueries({ queryKey: ['customer-cart'] });
+      if (isSession(next)) {
+        sessionStorage.set(next);
+        setSession(next);
+        await queryClient.invalidateQueries({ queryKey: ['customer-cart'] });
+      }
+      return next;
     },
     async register(input) {
       const next = await marketplaceApi.register(input);
+      if (isSession(next)) {
+        sessionStorage.set(next);
+        setSession(next);
+        await queryClient.invalidateQueries({ queryKey: ['customer-cart'] });
+      }
+      return next;
+    },
+    async completeOtp(next) {
       sessionStorage.set(next);
       setSession(next);
       await queryClient.invalidateQueries({ queryKey: ['customer-cart'] });

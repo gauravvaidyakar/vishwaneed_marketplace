@@ -15,6 +15,8 @@ import type {
   CreateReviewInput,
   CustomerProfile,
   CustomerProfileInput,
+  CustomerAuthResult,
+  CustomerOtpChallenge,
   HomeHeroSlide,
   LoginInput,
   MarketplaceApi,
@@ -25,6 +27,7 @@ import type {
   PaymentMethod,
   PaymentSession,
   PasswordResetRequestResult,
+  PasswordResetOtpResult,
   Paginated,
   Product,
   ProductQuery,
@@ -103,11 +106,11 @@ export class HttpMarketplaceApi implements MarketplaceApi {
     );
   }
 
-  login(input: LoginInput): Promise<AuthSession> {
+  login(input: LoginInput): Promise<CustomerAuthResult> {
     return this.client.post("/auth/login", input);
   }
 
-  register(input: RegisterInput): Promise<AuthSession> {
+  register(input: RegisterInput): Promise<CustomerAuthResult> {
     return this.client.post("/auth/register", input);
   }
 
@@ -121,6 +124,18 @@ export class HttpMarketplaceApi implements MarketplaceApi {
 
   resetPassword(input: ResetPasswordInput): Promise<void> {
     return this.client.post("/auth/reset-password", input);
+  }
+
+  resendCustomerOtp(challengeToken: string): Promise<CustomerOtpChallenge> {
+    return this.client.post("/auth/customer/otp/resend", { challengeToken });
+  }
+
+  verifyCustomerOtp(challengeToken: string, code: string): Promise<AuthSession> {
+    return this.client.post("/auth/customer/otp/verify", { challengeToken, code });
+  }
+
+  verifyPasswordResetOtp(challengeToken: string, code: string): Promise<PasswordResetOtpResult> {
+    return this.client.post("/auth/customer/password-reset/verify-otp", { challengeToken, code });
   }
 
   requestVerificationOtp(): Promise<VerificationOtpResult> {

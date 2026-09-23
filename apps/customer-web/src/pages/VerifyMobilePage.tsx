@@ -1,53 +1,64 @@
-import { CheckCircle2, ShieldCheck } from "lucide-react";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { marketplaceApi } from "../api";
-import { useAuth } from "../auth/AuthProvider";
-import { getErrorMessage } from "../api/errors";
+import { CheckCircle2, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { marketplaceApi } from '../api';
+import { getErrorMessage } from '../api/errors';
+import { useAuth } from '../auth/AuthProvider';
+import { otpChallengeStorage } from '../auth/otpChallengeStorage';
+import { OtpInput } from '../components/auth/OtpInput';
 
 export function VerifyMobilePage() {
-  const { session, updateCustomer } = useAuth();
+  const { completeOtp, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [code, setCode] = useState("");
-  const [developmentOtp, setDevelopmentOtp] = useState("");
-  const [sent, setSent] = useState(false);
+  const [challenge, setChallenge] = useState(() => otpChallengeStorage.get());
+  const [code, setCode] = useState('');
+  const [cooldown, setCooldown] = useState(challenge?.resendAfterSeconds ?? 0);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
-  const requestCode = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const result = await marketplaceApi.requestVerificationOtp();
-      if (result.verified) {
-        if (session) updateCustomer({ ...session.customer, mobileVerified: true });
-        void navigate("/account", { replace: true });
-        return;
-      }
-      setDevelopmentOtp(result.developmentOtp ?? "");
-      setSent(true);
-    } catch (caught) {
-      setError(getErrorMessage(caught));
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setInterval(() => setCooldown((current) => Math.max(0, current - 1)), 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldown]);
+
+  if (isAuthenticated) return <Navigate to="/account" replace />;
+  if (!challenge) return <Navigate to="/register" replace state={{ notice: 'Create an account to request a verification code.' }} />;
 
   const verify = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!/^\d{6}$/.test(code)) {
-      setError("Enter the 6-digit verification code.");
+      setError('Enter the complete 6-digit verification code.');
       return;
     }
     try {
       setLoading(true);
-      setError("");
-      await marketplaceApi.verifyOtp(code);
-      if (session) updateCustomer({ ...session.customer, mobileVerified: true });
-      void navigate("/account", {
-        replace: true,
-        state: { notice: "Mobile number verified successfully." },
-      });
+      setError('');
+      setNotice('');
+      const session = await marketplaceApi.verifyCustomerOtp(challenge.challengeToken, code);
+      otpChallengeStorage.clear();
+      await completeOtp(session);
+      void navigate('/', { replace: true, state: { notice: 'Your account has been verified.' } });
+    } catch (caught) {
+      setCode('');
+      setError(getErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resend = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      setNotice('');
+      const next = await marketplaceApi.resendCustomerOtp(challenge.challengeToken);
+      otpChallengeStorage.set(next);
+      setChallenge(next);
+      setCode('');
+      setCooldown(next.resendAfterSeconds);
+      setNotice('A new verification code was sent.');
     } catch (caught) {
       setError(getErrorMessage(caught));
     } finally {
@@ -55,31 +66,25 @@ export function VerifyMobilePage() {
     }
   };
 
-  return (
-    <div className="page shell verification-page">
-      <section className="auth-form-card">
-        <ShieldCheck aria-hidden="true" />
-        <span className="eyebrow">Account verification</span>
-        <h1>Verify your mobile number</h1>
-        <p>We use your verified number for order, delivery and account-security updates.</p>
-        {!sent ? (
-          <button className="button button--primary button--full" disabled={loading} onClick={() => void requestCode()}>
-            {loading ? "Sending…" : "Send verification code"}
-          </button>
-        ) : (
-          <form className="stack-form" onSubmit={(event) => void verify(event)}>
-            <label className="form-field">
-              <span>6-digit verification code</span>
-              <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ""))} />
-            </label>
-            {developmentOtp && <p className="form-success"><CheckCircle2 size={16} /> Development code: {developmentOtp}</p>}
-            {error && <p className="form-error" role="alert">{error}</p>}
-            <button className="button button--primary button--full" disabled={loading}>{loading ? "Verifying…" : "Verify mobile"}</button>
-            <button className="button button--secondary button--full" type="button" disabled={loading} onClick={() => void requestCode()}>Send a new code</button>
-          </form>
-        )}
-        {!sent && error && <p className="form-error" role="alert">{error}</p>}
-      </section>
-    </div>
-  );
+  return <div className="page shell verification-page"><section className="auth-form-card otp-card">
+    <ShieldCheck aria-hidden="true" />
+    <span className="eyebrow">Account verification</span>
+    <h1>Verify your mobile number</h1>
+    <p>Enter the code sent to <strong>{challenge.maskedDestination}</strong>. The code expires in {challenge.expiresInMinutes} minutes.</p>
+    <form className="stack-form" onSubmit={(event) => void verify(event)}>
+      <span className="otp-label">6-digit verification code</span>
+      <OtpInput value={code} onChange={setCode} disabled={loading} />
+      {notice && <p className="form-success" role="status">{notice}</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <button className="button button--primary button--full" disabled={loading || code.length !== 6}>{loading ? 'Verifying…' : 'Verify account'}</button>
+      <div className="otp-resend">
+        <span>Didn’t receive the code?</span>
+        <button className="link-button" type="button" disabled={loading || cooldown > 0} onClick={() => void resend()}>
+          {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend code'}
+        </button>
+      </div>
+    </form>
+    <p className="otp-help"><CheckCircle2 size={16} /> Never share this code with anyone.</p>
+    <Link className="back-link" to="/login">Back to sign in</Link>
+  </section></div>;
 }
