@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { NotificationStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../database/prisma.service";
 import { WhatsAppProviderRouter } from "./whatsapp-provider";
+import { SmsProviderRouter } from "./sms-provider";
 
 @Injectable()
 export class NotificationsService {
@@ -12,6 +13,7 @@ export class NotificationsService {
     private readonly prisma: PrismaService,
     private readonly whatsapp: WhatsAppProviderRouter,
     private readonly config: ConfigService,
+    private readonly sms: SmsProviderRouter,
   ) {}
 
   list(userId: string) {
@@ -88,6 +90,59 @@ export class NotificationsService {
         await this.prisma.notification.updateMany({
           where: notificationId ? { id: notificationId } : { dedupeKey },
           data: { status: NotificationStatus.FAILED, failureReason: message },
+        }).catch(() => undefined);
+      }
+      return null;
+    }
+  }
+
+  async sendSms(
+    userId: string,
+    templateKey: string,
+    payload: Record<string, unknown>,
+    message: string,
+  ) {
+    let notificationId: string | undefined;
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { mobile: true },
+      });
+      if (!user) return null;
+      const recipient = user.mobile;
+      const notification = await this.prisma.notification.create({
+        data: {
+          userId,
+          channel: "SMS",
+          templateKey,
+          payload: payload as Prisma.InputJsonValue,
+          status: recipient
+            ? NotificationStatus.QUEUED
+            : NotificationStatus.FAILED,
+          failureReason: recipient
+            ? null
+            : "No mobile number is configured for this account",
+        },
+      });
+      notificationId = notification.id;
+      if (!recipient) return notification;
+      const providerReference = await this.sms.send(recipient, message);
+      return this.prisma.notification.update({
+        where: { id: notification.id },
+        data: {
+          status: NotificationStatus.SENT,
+          providerReference,
+          sentAt: new Date(),
+        },
+      });
+    } catch (error) {
+      const diagnostic = error instanceof Error ? error.name : "UnknownError";
+      const messageText = "SMS provider delivery failed";
+      this.logger.error(`SMS notification ${templateKey} failed (${diagnostic})`);
+      if (notificationId) {
+        await this.prisma.notification.updateMany({
+          where: { id: notificationId },
+          data: { status: NotificationStatus.FAILED, failureReason: messageText },
         }).catch(() => undefined);
       }
       return null;

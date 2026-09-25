@@ -7,9 +7,11 @@ and synchronised in Interakt.
 
 Interakt body variables are sent in the following order:
 
+Customer registration and password-reset OTPs are intentionally excluded from
+WhatsApp. Authentication OTP delivery uses the SMS provider boundary.
+
 | Logical template | Body values, in order |
 | --- | --- |
-| `account_verification_otp` | OTP code, expiry time in minutes |
 | `order_confirmation` | order number, amount, payment method, vendor count |
 | `vendor_new_order` | vendor order number, master order number, amount, item count, payment method |
 | `order_<status>` | master order number, vendor order number, vendor name, status |

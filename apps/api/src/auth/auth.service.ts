@@ -497,12 +497,11 @@ export class AuthService {
     const template = purpose === VerificationOtpPurpose.PASSWORD_RESET
       ? "password_reset_otp"
       : "customer_registration_otp";
-    const delivery = await this.notifications?.sendWhatsApp(
+    const delivery = await this.notifications?.sendSms(
       user.id,
       template,
       { expiresInMinutes: ttlMinutes },
-      undefined,
-      { otp: code, expiresInMinutes: ttlMinutes },
+      `Your Vishwaneed verification code is ${code}. This code is valid for ${ttlMinutes} minutes. Do not share this code with anyone.`,
     );
     if (!delivery || delivery.status !== NotificationStatus.SENT) {
       await this.prisma.verificationOtp.deleteMany({

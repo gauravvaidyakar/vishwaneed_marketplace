@@ -26,6 +26,12 @@ POST /api/v1/auth/login
 
 POST /api/v1/auth/verify-otp
 
+POST /api/v1/auth/customer/otp/resend
+
+POST /api/v1/auth/customer/otp/verify
+
+POST /api/v1/auth/customer/password-reset/verify-otp
+
 POST /api/v1/auth/refresh
 
 POST /api/v1/auth/logout

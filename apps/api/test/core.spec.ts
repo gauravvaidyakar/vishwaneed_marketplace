@@ -352,10 +352,10 @@ describe("platform security rules", () => {
     expect(update).toHaveBeenCalledWith({ where: { id: "otp-id" }, data: { attempts: { increment: 1 } } });
   });
 
-  it("stores only a hash and sends the generated verification code through notifications", async () => {
+  it("stores only a hash and sends the generated verification code through SMS", async () => {
     const create = vi.fn().mockResolvedValue({});
     const deleteMany = vi.fn().mockResolvedValue({ count: 0 });
-    const sendWhatsApp = vi.fn().mockResolvedValue({
+    const sendSms = vi.fn().mockResolvedValue({
       status: NotificationStatus.SENT,
     });
     const prisma = {
@@ -375,7 +375,7 @@ describe("platform security rules", () => {
         key === "NODE_ENV" ? "development" : fallback,
       ),
     } as unknown as ConfigService;
-    const notifications = { sendWhatsApp } as unknown as NotificationsService;
+    const notifications = { sendSms } as unknown as NotificationsService;
     const service = new AuthService(
       prisma,
       {} as JwtService,
@@ -384,17 +384,22 @@ describe("platform security rules", () => {
     );
 
     const result = await service.requestVerificationOtp("user-id");
-    const deliveryPayload = sendWhatsApp.mock.calls[0]?.[4] as {
-      otp: string;
-    };
+    const smsMessage = sendSms.mock.calls[0]?.[3] as string;
+    const deliveredOtp = smsMessage.match(/\b\d{6}\b/)?.[0] ?? "";
     const createInput = create.mock.calls[0]?.[0] as
       | { data: { codeHash: string } }
       | undefined;
     const storedHash = createInput?.data.codeHash ?? "";
 
-    expect(deliveryPayload.otp).toMatch(/^\d{6}$/);
-    expect(storedHash).not.toBe(deliveryPayload.otp);
-    await expect(compare(deliveryPayload.otp, storedHash)).resolves.toBe(true);
+    expect(sendSms).toHaveBeenCalledWith(
+      "user-id",
+      "customer_registration_otp",
+      { expiresInMinutes: 5 },
+      expect.stringContaining("Do not share this code with anyone"),
+    );
+    expect(deliveredOtp).toMatch(/^\d{6}$/);
+    expect(storedHash).not.toBe(deliveredOtp);
+    await expect(compare(deliveredOtp, storedHash)).resolves.toBe(true);
     expect(result).toMatchObject({ message: "Verification code sent securely" });
     expect(result).not.toHaveProperty("developmentOtp");
   });
@@ -424,7 +429,7 @@ describe("platform security rules", () => {
       get: vi.fn((_key: string, fallback: string) => fallback),
     } as unknown as ConfigService;
     const notifications = {
-      sendWhatsApp: vi.fn().mockResolvedValue(null),
+      sendSms: vi.fn().mockResolvedValue(null),
     } as unknown as NotificationsService;
     const service = new AuthService(
       prisma,
@@ -443,6 +448,47 @@ describe("platform security rules", () => {
         consumedAt: null,
       },
     });
+  });
+
+  it("uses SMS rather than WhatsApp for a customer password-reset OTP", async () => {
+    const sendSms = vi.fn().mockResolvedValue({ status: NotificationStatus.SENT });
+    const sendWhatsApp = vi.fn();
+    const prisma = {
+      user: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "customer-user",
+          email: "customer@example.com",
+          mobile: "9876543210",
+          role: Role.CUSTOMER,
+          status: UserStatus.ACTIVE,
+        }),
+      },
+      verificationOtp: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({}),
+      },
+      $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
+    } as unknown as PrismaService;
+    const jwt = {
+      signAsync: vi.fn().mockResolvedValue("password-reset-challenge"),
+    } as unknown as JwtService;
+    const config = {
+      get: vi.fn((_key: string, fallback?: unknown) => fallback),
+      getOrThrow: vi.fn().mockReturnValue("a-secure-test-secret-that-is-long-enough"),
+    } as unknown as ConfigService;
+    const notifications = { sendSms, sendWhatsApp } as unknown as NotificationsService;
+    const service = new AuthService(prisma, jwt, config, notifications);
+
+    await expect(service.forgotPassword({ emailOrMobile: "customer@example.com" }))
+      .resolves.toMatchObject({ challengeToken: "password-reset-challenge" });
+    expect(sendSms).toHaveBeenCalledWith(
+      "customer-user",
+      "password_reset_otp",
+      { expiresInMinutes: 5 },
+      expect.stringContaining("Vishwaneed verification code"),
+    );
+    expect(sendWhatsApp).not.toHaveBeenCalled();
   });
 
   it("requires independent strong JWT secrets and field encryption", () => {

@@ -58,6 +58,7 @@ export function validateEnvironment(input: Environment): Environment {
     WHATSAPP_PROVIDER:
       input.WHATSAPP_PROVIDER ??
       (environment === "production" ? "INTERAKT" : "DEVELOPMENT"),
+    SMS_PROVIDER: input.SMS_PROVIDER ?? "UNCONFIGURED",
     DEV_SHIPPING_BASE_MINOR: input.DEV_SHIPPING_BASE_MINOR ?? "4000",
     DEV_SHIPPING_PER_KG_MINOR: input.DEV_SHIPPING_PER_KG_MINOR ?? "2000",
   };

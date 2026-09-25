@@ -3,6 +3,7 @@ import { NotificationStatus } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaService } from "../src/database/prisma.service";
 import { NotificationsService } from "../src/notifications/notifications.service";
+import { SmsProviderRouter } from "../src/notifications/sms-provider";
 import type { WhatsAppProviderRouter } from "../src/notifications/whatsapp-provider";
 
 function config(): ConfigService {
@@ -11,7 +12,18 @@ function config(): ConfigService {
   } as unknown as ConfigService;
 }
 
-describe("WhatsApp order notifications", () => {
+function sms(send = vi.fn()): SmsProviderRouter {
+  return { send } as unknown as SmsProviderRouter;
+}
+
+describe("Notification delivery", () => {
+  it("fails closed when no real SMS provider is configured", () => {
+    const provider = new SmsProviderRouter(config());
+    expect(() => provider.send("9876543210", "sensitive message")).toThrow(
+      "SMS provider has not been configured",
+    );
+  });
+
   it("notifies the customer and every relevant vendor when an order is placed", async () => {
     const prisma = {
       masterOrder: {
@@ -37,6 +49,7 @@ describe("WhatsApp order notifications", () => {
       prisma,
       { send: vi.fn() } as unknown as WhatsAppProviderRouter,
       config(),
+      sms(),
     );
     const send = vi.spyOn(service, "sendWhatsApp").mockResolvedValue(null);
 
@@ -81,6 +94,7 @@ describe("WhatsApp order notifications", () => {
       prisma,
       { send } as unknown as WhatsAppProviderRouter,
       config(),
+      sms(),
     );
 
     await service.sendWhatsApp(
@@ -107,6 +121,7 @@ describe("WhatsApp order notifications", () => {
       prisma,
       { send } as unknown as WhatsAppProviderRouter,
       config(),
+      sms(),
     );
 
     await expect(
@@ -137,6 +152,7 @@ describe("WhatsApp order notifications", () => {
       prisma,
       { send: vi.fn() } as unknown as WhatsAppProviderRouter,
       config(),
+      sms(),
     );
 
     await service.sendWhatsApp(
@@ -154,5 +170,47 @@ describe("WhatsApp order notifications", () => {
     expect(createInput.data.failureReason).toBe(
       "No mobile number is configured for this account",
     );
+  });
+
+  it("sends authentication content through SMS without storing the OTP", async () => {
+    const sendSms = vi.fn().mockResolvedValue("sms-reference");
+    const create = vi.fn().mockResolvedValue({ id: "sms-notification" });
+    const update = vi.fn().mockResolvedValue({
+      id: "sms-notification",
+      status: NotificationStatus.SENT,
+    });
+    const prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({ mobile: "9876543210" }),
+      },
+      notification: { create, update, updateMany: vi.fn() },
+    } as unknown as PrismaService;
+    const whatsappSend = vi.fn();
+    const service = new NotificationsService(
+      prisma,
+      { send: whatsappSend } as unknown as WhatsAppProviderRouter,
+      config(),
+      sms(sendSms),
+    );
+
+    await service.sendSms(
+      "customer-user",
+      "customer_registration_otp",
+      { expiresInMinutes: 5 },
+      "Your Vishwaneed verification code is 482913. This code is valid for 5 minutes. Do not share this code with anyone.",
+    );
+
+    expect(sendSms).toHaveBeenCalledWith(
+      "9876543210",
+      expect.stringContaining("482913"),
+    );
+    expect(whatsappSend).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        channel: "SMS",
+        payload: { expiresInMinutes: 5 },
+      }) as object,
+    }));
+    expect(JSON.stringify(create.mock.calls)).not.toContain("482913");
   });
 });
