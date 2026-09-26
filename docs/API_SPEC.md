@@ -375,7 +375,8 @@ DELETE /api/v1/admin/integration-settings/:key
 
 The GET response contains only configured/source state and masked hints. It never
 returns plaintext or encrypted credential values. PATCH accepts only the approved
-Razorpay, Shiprocket and Interakt keys. Stored values are encrypted at rest and
+Razorpay, Shiprocket, Interakt and MSG91 keys. MSG91 requires
+`MSG91_AUTH_KEY` and `MSG91_OTP_TEMPLATE_ID`. Stored values are encrypted at rest and
 all changes are recorded in AuditLog without credential contents. Environment
 variables remain fallback values when no database override exists.
 

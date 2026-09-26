@@ -21,4 +21,10 @@ export class UpdateIntegrationSettingsDto {
 
   @IsOptional() @IsString() @MinLength(6) @MaxLength(1024)
   INTERAKT_API_KEY?: string;
+
+  @IsOptional() @IsString() @MinLength(6) @MaxLength(512)
+  MSG91_AUTH_KEY?: string;
+
+  @IsOptional() @IsString() @MinLength(6) @MaxLength(128)
+  MSG91_OTP_TEMPLATE_ID?: string;
 }

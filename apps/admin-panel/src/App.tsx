@@ -2144,7 +2144,7 @@ function System() {
                 </p>
               </div>
             </section>
-            {(["RAZORPAY", "SHIPROCKET", "INTERAKT"] as const).map(
+            {(["RAZORPAY", "SHIPROCKET", "INTERAKT", "MSG91"] as const).map(
               (provider) => {
                 const settings = q.data.filter(
                   (setting) => setting.provider === provider,
@@ -2225,7 +2225,7 @@ function System() {
 
 interface IntegrationSetting {
   key: string;
-  provider: "RAZORPAY" | "SHIPROCKET" | "INTERAKT";
+  provider: "RAZORPAY" | "SHIPROCKET" | "INTERAKT" | "MSG91";
   label: string;
   secret: boolean;
   configured: boolean;

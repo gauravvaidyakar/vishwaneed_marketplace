@@ -66,4 +66,36 @@ describe("integration settings", () => {
     expect(persisted.create.encryptedValue).not.toContain("live-secret-value");
     expect(JSON.stringify(auditCreate.mock.calls)).not.toContain("live-secret-value");
   });
+
+  it("exposes MSG91 configuration metadata without exposing its auth key", async () => {
+    const prisma = {
+      integrationSetting: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            key: "MSG91_AUTH_KEY",
+            valueHint: "••••••••7890",
+            updatedAt: new Date("2026-09-26T12:00:00.000Z"),
+          },
+        ]),
+      },
+    } as unknown as PrismaService;
+    const service = new IntegrationSettingsService(
+      prisma,
+      { get: vi.fn() } as unknown as ConfigService,
+      encryption,
+    );
+
+    const result = await service.list();
+    expect(result.find((item) => item.key === "MSG91_AUTH_KEY")).toMatchObject({
+      provider: "MSG91",
+      configured: true,
+      maskedValue: "••••••••7890",
+      secret: true,
+    });
+    expect(result.find((item) => item.key === "MSG91_OTP_TEMPLATE_ID")).toMatchObject({
+      provider: "MSG91",
+      configured: false,
+      secret: false,
+    });
+  });
 });

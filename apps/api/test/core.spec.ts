@@ -384,8 +384,10 @@ describe("platform security rules", () => {
     );
 
     const result = await service.requestVerificationOtp("user-id");
-    const smsMessage = sendSms.mock.calls[0]?.[3] as string;
-    const deliveredOtp = smsMessage.match(/\b\d{6}\b/)?.[0] ?? "";
+    const smsDelivery = sendSms.mock.calls[0]?.[3] as
+      | { otp: string; expiresInMinutes: number }
+      | undefined;
+    const deliveredOtp = smsDelivery?.otp ?? "";
     const createInput = create.mock.calls[0]?.[0] as
       | { data: { codeHash: string } }
       | undefined;
@@ -395,7 +397,7 @@ describe("platform security rules", () => {
       "user-id",
       "customer_registration_otp",
       { expiresInMinutes: 5 },
-      expect.stringContaining("Do not share this code with anyone"),
+      smsDelivery,
     );
     expect(deliveredOtp).toMatch(/^\d{6}$/);
     expect(storedHash).not.toBe(deliveredOtp);
@@ -482,12 +484,17 @@ describe("platform security rules", () => {
 
     await expect(service.forgotPassword({ emailOrMobile: "customer@example.com" }))
       .resolves.toMatchObject({ challengeToken: "password-reset-challenge" });
+    const resetDelivery = sendSms.mock.calls[0]?.[3] as
+      | { otp: string; expiresInMinutes: number }
+      | undefined;
     expect(sendSms).toHaveBeenCalledWith(
       "customer-user",
       "password_reset_otp",
       { expiresInMinutes: 5 },
-      expect.stringContaining("Vishwaneed verification code"),
+      resetDelivery,
     );
+    expect(resetDelivery).toMatchObject({ expiresInMinutes: 5 });
+    expect(resetDelivery?.otp).toMatch(/^\d{6}$/);
     expect(sendWhatsApp).not.toHaveBeenCalled();
   });
 

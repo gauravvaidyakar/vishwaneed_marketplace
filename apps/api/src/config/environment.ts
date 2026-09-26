@@ -58,7 +58,12 @@ export function validateEnvironment(input: Environment): Environment {
     WHATSAPP_PROVIDER:
       input.WHATSAPP_PROVIDER ??
       (environment === "production" ? "INTERAKT" : "DEVELOPMENT"),
-    SMS_PROVIDER: input.SMS_PROVIDER ?? "UNCONFIGURED",
+    SMS_PROVIDER:
+      input.SMS_PROVIDER ??
+      (environment === "production" ? "MSG91" : "UNCONFIGURED"),
+    MSG91_API_URL:
+      input.MSG91_API_URL ?? "https://control.msg91.com/api/v5/otp",
+    MSG91_DEFAULT_COUNTRY_CODE: input.MSG91_DEFAULT_COUNTRY_CODE ?? "91",
     DEV_SHIPPING_BASE_MINOR: input.DEV_SHIPPING_BASE_MINOR ?? "4000",
     DEV_SHIPPING_PER_KG_MINOR: input.DEV_SHIPPING_PER_KG_MINOR ?? "2000",
   };

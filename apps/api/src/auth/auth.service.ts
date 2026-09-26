@@ -501,7 +501,7 @@ export class AuthService {
       user.id,
       template,
       { expiresInMinutes: ttlMinutes },
-      `Your Vishwaneed verification code is ${code}. This code is valid for ${ttlMinutes} minutes. Do not share this code with anyone.`,
+      { otp: code, expiresInMinutes: ttlMinutes },
     );
     if (!delivery || delivery.status !== NotificationStatus.SENT) {
       await this.prisma.verificationOtp.deleteMany({

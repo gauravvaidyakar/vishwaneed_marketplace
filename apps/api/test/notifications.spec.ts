@@ -2,8 +2,12 @@ import type { ConfigService } from "@nestjs/config";
 import { NotificationStatus } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaService } from "../src/database/prisma.service";
+import type { IntegrationSettingsService } from "../src/integration-settings/integration-settings.service";
 import { NotificationsService } from "../src/notifications/notifications.service";
-import { SmsProviderRouter } from "../src/notifications/sms-provider";
+import {
+  Msg91SmsProvider,
+  SmsProviderRouter,
+} from "../src/notifications/sms-provider";
 import type { WhatsAppProviderRouter } from "../src/notifications/whatsapp-provider";
 
 function config(): ConfigService {
@@ -16,12 +20,55 @@ function sms(send = vi.fn()): SmsProviderRouter {
   return { send } as unknown as SmsProviderRouter;
 }
 
+function settings(values: Record<string, string> = {}): IntegrationSettingsService {
+  return {
+    get: vi.fn((key: string) => Promise.resolve(values[key])),
+  } as unknown as IntegrationSettingsService;
+}
+
 describe("Notification delivery", () => {
-  it("fails closed when no real SMS provider is configured", () => {
-    const provider = new SmsProviderRouter(config());
-    expect(() => provider.send("9876543210", "sensitive message")).toThrow(
+  it("fails closed when no real SMS provider is configured", async () => {
+    const provider = new SmsProviderRouter(config(), settings());
+    await expect(provider.send({
+      recipient: "9876543210",
+      otp: "482913",
+      expiresInMinutes: 5,
+    })).rejects.toThrow(
       "SMS provider has not been configured",
     );
+  });
+
+  it("sends a server-generated OTP through MSG91 without putting the auth key in the URL", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ type: "success", request_id: "msg91-request" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const provider = new Msg91SmsProvider(
+      {
+        get: vi.fn((key: string, fallback?: string) =>
+          key === "MSG91_DEFAULT_COUNTRY_CODE" ? "91" : fallback,
+        ),
+      } as unknown as ConfigService,
+      settings({
+        MSG91_AUTH_KEY: "private-auth-key",
+        MSG91_OTP_TEMPLATE_ID: "template-id",
+      }),
+    );
+
+    await expect(provider.send({
+      recipient: "+91 98765 43210",
+      otp: "482913",
+      expiresInMinutes: 10,
+    })).resolves.toBe("msg91-request");
+
+    const [requestUrl, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
+    expect(requestUrl.searchParams.get("mobile")).toBe("919876543210");
+    expect(requestUrl.searchParams.get("otp")).toBe("482913");
+    expect(requestUrl.searchParams.has("authkey")).toBe(false);
+    expect((init.headers as Record<string, string>).authkey).toBe("private-auth-key");
+    fetchMock.mockRestore();
   });
 
   it("notifies the customer and every relevant vendor when an order is placed", async () => {
@@ -197,13 +244,14 @@ describe("Notification delivery", () => {
       "customer-user",
       "customer_registration_otp",
       { expiresInMinutes: 5 },
-      "Your Vishwaneed verification code is 482913. This code is valid for 5 minutes. Do not share this code with anyone.",
+      { otp: "482913", expiresInMinutes: 5 },
     );
 
-    expect(sendSms).toHaveBeenCalledWith(
-      "9876543210",
-      expect.stringContaining("482913"),
-    );
+    expect(sendSms).toHaveBeenCalledWith({
+      recipient: "9876543210",
+      otp: "482913",
+      expiresInMinutes: 5,
+    });
     expect(whatsappSend).not.toHaveBeenCalled();
     expect(create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({

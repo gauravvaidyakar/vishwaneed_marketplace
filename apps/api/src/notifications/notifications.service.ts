@@ -100,7 +100,7 @@ export class NotificationsService {
     userId: string,
     templateKey: string,
     payload: Record<string, unknown>,
-    message: string,
+    delivery: { otp: string; expiresInMinutes: number },
   ) {
     let notificationId: string | undefined;
     try {
@@ -126,7 +126,11 @@ export class NotificationsService {
       });
       notificationId = notification.id;
       if (!recipient) return notification;
-      const providerReference = await this.sms.send(recipient, message);
+      const providerReference = await this.sms.send({
+        recipient,
+        otp: delivery.otp,
+        expiresInMinutes: delivery.expiresInMinutes,
+      });
       return this.prisma.notification.update({
         where: { id: notification.id },
         data: {
