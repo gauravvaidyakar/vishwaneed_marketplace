@@ -10,6 +10,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { otpChallengeStorage } from '../auth/otpChallengeStorage';
 import { OtpInput } from '../components/auth/OtpInput';
 import { FormField } from '../components/ui/FormField';
+import type { CustomerOtpChallenge } from '../api/types';
+import { resendMsg91Otp, startMsg91Otp, verifyMsg91Otp } from '../auth/msg91OtpWidget';
 
 const loginSchema = z.object({ emailOrMobile: z.string().min(5, 'Enter your email or mobile number.'), password: z.string().min(8, 'Password must be at least 8 characters.') });
 type LoginForm = z.infer<typeof loginSchema>;
@@ -67,6 +69,8 @@ export function ForgotPasswordPage() {
   const [busy, setBusy] = useState(false);
   const [serverError, setServerError] = useState('');
   const [notice, setNotice] = useState('');
+  const [otpChallenge, setOtpChallenge] = useState<CustomerOtpChallenge | null>(null);
+  const [requestId, setRequestId] = useState<string>();
   const form = useForm<ForgotForm>({ resolver: zodResolver(forgotSchema), defaultValues: { emailOrMobile: '' } });
   const resetForm = useForm<ResetForm>({ resolver: zodResolver(resetSchema), defaultValues: { password: '', confirmPassword: '' } });
 
@@ -76,9 +80,9 @@ export function ForgotPasswordPage() {
     return () => window.clearInterval(timer);
   }, [cooldown]);
 
-  const request = form.handleSubmit(async ({ emailOrMobile }) => { try { setBusy(true); setServerError(''); const result = await marketplaceApi.forgotPassword(emailOrMobile); setChallengeToken(result.challengeToken); setMaskedDestination(result.maskedDestination); setCooldown(result.resendAfterSeconds); setStep('otp'); } catch (error) { setServerError(getErrorMessage(error)); } finally { setBusy(false); } });
-  const verify = async (event: React.FormEvent) => { event.preventDefault(); if (!/^\d{6}$/.test(code)) { setServerError('Enter the complete 6-digit verification code.'); return; } try { setBusy(true); setServerError(''); const result = await marketplaceApi.verifyPasswordResetOtp(challengeToken, code); setResetToken(result.resetToken); setStep('password'); } catch (error) { setCode(''); setServerError(getErrorMessage(error)); } finally { setBusy(false); } };
-  const resend = async () => { try { setBusy(true); setServerError(''); setNotice(''); const result = await marketplaceApi.resendCustomerOtp(challengeToken); setChallengeToken(result.challengeToken); setMaskedDestination(result.maskedDestination); setCooldown(result.resendAfterSeconds); setCode(''); setNotice('A new verification code was sent.'); } catch (error) { setServerError(getErrorMessage(error)); } finally { setBusy(false); } };
+  const request = form.handleSubmit(async ({ emailOrMobile }) => { try { setBusy(true); setServerError(''); const result = await marketplaceApi.forgotPassword(emailOrMobile); if (!result.otp) throw new Error(result.message); const challenge: CustomerOtpChallenge = { verificationRequired: true, challengeToken: result.challengeToken, maskedDestination: result.maskedDestination, message: result.message, expiresInMinutes: 5, resendAfterSeconds: result.resendAfterSeconds, otp: result.otp }; setChallengeToken(result.challengeToken); setMaskedDestination(result.maskedDestination); setOtpChallenge(challenge); const nextRequestId = await startMsg91Otp(challenge); setRequestId(nextRequestId); setCooldown(result.resendAfterSeconds); setNotice('A verification code was sent by SMS.'); setStep('otp'); } catch (error) { setServerError(getErrorMessage(error)); } finally { setBusy(false); } });
+  const verify = async (event: React.FormEvent) => { event.preventDefault(); if (!/^\d{6}$/.test(code)) { setServerError('Enter the complete 6-digit verification code.'); return; } if (!otpChallenge) return; try { setBusy(true); setServerError(''); const accessToken = await verifyMsg91Otp(otpChallenge, code, requestId); const result = await marketplaceApi.verifyPasswordResetOtp(challengeToken, accessToken); setResetToken(result.resetToken); setStep('password'); } catch (error) { setCode(''); setServerError(getErrorMessage(error)); } finally { setBusy(false); } };
+  const resend = async () => { if (!otpChallenge) return; try { setBusy(true); setServerError(''); setNotice(''); const nextRequestId = await resendMsg91Otp(otpChallenge, requestId); setRequestId(nextRequestId); setCooldown(otpChallenge.resendAfterSeconds); setCode(''); setNotice('A new verification code was sent by SMS.'); } catch (error) { setServerError(getErrorMessage(error)); } finally { setBusy(false); } };
   const updatePassword = resetForm.handleSubmit(async ({ password }) => { try { setServerError(''); await marketplaceApi.resetPassword({ token: resetToken, password }); void navigate('/login', { replace: true, state: { notice: 'Password updated. Sign in with your new password.' } }); } catch (error) { setServerError(getErrorMessage(error)); } });
 
   return <AuthShell title="Reset your password" intro={step === 'request' ? 'Verify your registered mobile before choosing a new password.' : step === 'otp' ? `Enter the code sent to ${maskedDestination}.` : 'Choose a strong new password for your account.'}>

@@ -6,16 +6,35 @@ import { getErrorMessage } from '../api/errors';
 import { useAuth } from '../auth/AuthProvider';
 import { otpChallengeStorage } from '../auth/otpChallengeStorage';
 import { OtpInput } from '../components/auth/OtpInput';
+import { resendMsg91Otp, startMsg91Otp, verifyMsg91Otp } from '../auth/msg91OtpWidget';
 
 export function VerifyMobilePage() {
   const { completeOtp, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [challenge, setChallenge] = useState(() => otpChallengeStorage.get());
+  const [challenge] = useState(() => otpChallengeStorage.get());
   const [code, setCode] = useState('');
   const [cooldown, setCooldown] = useState(challenge?.resendAfterSeconds ?? 0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [requestId, setRequestId] = useState<string>();
+
+  useEffect(() => {
+    if (!challenge) return;
+    let active = true;
+    setLoading(true);
+    setError('');
+    void startMsg91Otp(challenge)
+      .then((nextRequestId) => {
+        if (!active) return;
+        setRequestId(nextRequestId);
+        setCooldown(challenge.resendAfterSeconds);
+        setNotice('A verification code was sent by SMS.');
+      })
+      .catch((caught: unknown) => active && setError(getErrorMessage(caught)))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [challenge]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -36,7 +55,8 @@ export function VerifyMobilePage() {
       setLoading(true);
       setError('');
       setNotice('');
-      const session = await marketplaceApi.verifyCustomerOtp(challenge.challengeToken, code);
+      const accessToken = await verifyMsg91Otp(challenge, code, requestId);
+      const session = await marketplaceApi.verifyCustomerOtp(challenge.challengeToken, accessToken);
       otpChallengeStorage.clear();
       await completeOtp(session);
       void navigate('/', { replace: true, state: { notice: 'Your account has been verified.' } });
@@ -53,11 +73,10 @@ export function VerifyMobilePage() {
       setLoading(true);
       setError('');
       setNotice('');
-      const next = await marketplaceApi.resendCustomerOtp(challenge.challengeToken);
-      otpChallengeStorage.set(next);
-      setChallenge(next);
+      const nextRequestId = await resendMsg91Otp(challenge, requestId);
+      setRequestId(nextRequestId);
       setCode('');
-      setCooldown(next.resendAfterSeconds);
+      setCooldown(challenge.resendAfterSeconds);
       setNotice('A new verification code was sent.');
     } catch (caught) {
       setError(getErrorMessage(caught));

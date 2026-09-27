@@ -7,6 +7,7 @@ import { JwtAuthGuard } from "./jwt-auth.guard";
 import { JwtStrategy } from "./jwt.strategy";
 import { RolesGuard } from "../common/roles.guard";
 import { NotificationsModule } from "../notifications/notifications.module";
+import { CustomerOtpProvider } from "./customer-otp-provider";
 
 @Global()
 @Module({
@@ -16,7 +17,7 @@ import { NotificationsModule } from "../notifications/notifications.module";
     NotificationsModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  providers: [AuthService, CustomerOtpProvider, JwtStrategy, JwtAuthGuard, RolesGuard],
   exports: [JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}

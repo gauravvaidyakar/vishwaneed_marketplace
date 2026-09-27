@@ -32,6 +32,7 @@ import type {
   ResetPasswordDto,
   VerifyOtpDto,
 } from "./auth.dto";
+import { CustomerOtpProvider } from "./customer-otp-provider";
 
 interface Tokens {
   accessToken: string;
@@ -50,6 +51,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     @Optional() private readonly notifications?: NotificationsService,
+    @Optional() private readonly customerOtp?: CustomerOtpProvider,
   ) {}
 
   async register(input: RegisterDto): Promise<Record<string, unknown>> {
@@ -341,61 +343,43 @@ export class AuthService {
     if (purpose === VerificationOtpPurpose.ACCOUNT_VERIFICATION && user.mobileVerifiedAt) {
       throw new BadRequestException("Account is already verified. Please sign in.");
     }
-    const result = await this.issueOtp(user, purpose);
+    const otp = await this.customerOtpConfiguration(user);
     return {
-      message: "A new verification code was sent securely",
+      message: "MSG91 is ready to resend the verification code securely",
       challengeToken: await this.signOtpChallenge(payload.sub, payload.type),
       maskedDestination: this.maskMobile(user.mobile),
-      ...result,
+      expiresInMinutes: 5,
+      resendAfterSeconds: this.otpCooldownSeconds(),
+      otp,
     };
   }
 
-  async verifyCustomerAccountOtp(challengeToken: string, code: string) {
+  async verifyCustomerAccountOtp(challengeToken: string, accessToken: string) {
     const payload = await this.verifyOtpChallenge(challengeToken, "customer_account_verification");
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || user.role !== Role.CUSTOMER || user.status !== UserStatus.ACTIVE) {
       throw new BadRequestException("Verification code is invalid or expired");
     }
-    const challenge = await this.validateOtp(
-      user.id,
-      VerificationOtpPurpose.ACCOUNT_VERIFICATION,
-      code,
-    );
+    await this.verifyCustomerOtpAccessToken(user, accessToken);
     const verifiedAt = new Date();
-    await this.prisma.$transaction(async (tx) => {
-      const consumed = await tx.verificationOtp.updateMany({
-        where: { id: challenge.id, consumedAt: null },
-        data: { consumedAt: verifiedAt },
-      });
-      if (consumed.count !== 1) throw new BadRequestException("Verification code is invalid or expired");
-      await tx.user.update({
-        where: { id: user.id },
-        data: { mobileVerifiedAt: verifiedAt, lastLoginAt: verifiedAt },
-      });
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { mobileVerifiedAt: verifiedAt, lastLoginAt: verifiedAt },
     });
     return this.createSession({ ...user, mobileVerifiedAt: verifiedAt });
   }
 
-  async verifyPasswordResetOtp(challengeToken: string, code: string) {
+  async verifyPasswordResetOtp(challengeToken: string, accessToken: string) {
     const payload = await this.verifyOtpChallenge(challengeToken, "customer_password_reset");
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user || user.role !== Role.CUSTOMER || user.status !== UserStatus.ACTIVE) {
       throw new BadRequestException("Verification code is invalid or expired");
     }
-    const challenge = await this.validateOtp(
-      user.id,
-      VerificationOtpPurpose.PASSWORD_RESET,
-      code,
-    );
+    await this.verifyCustomerOtpAccessToken(user, accessToken);
     const token = randomBytes(32).toString("hex");
     const tokenHash = createHash("sha256").update(token).digest("hex");
     const expiresAt = new Date(Date.now() + 15 * 60_000);
     await this.prisma.$transaction(async (tx) => {
-      const consumed = await tx.verificationOtp.updateMany({
-        where: { id: challenge.id, consumedAt: null },
-        data: { consumedAt: new Date() },
-      });
-      if (consumed.count !== 1) throw new BadRequestException("Verification code is invalid or expired");
       await tx.passwordResetToken.updateMany({
         where: { userId: user.id, usedAt: null },
         data: { usedAt: new Date() },
@@ -446,7 +430,7 @@ export class AuthService {
     user: User,
     purpose: VerificationOtpPurpose,
   ): Promise<Record<string, unknown>> {
-    const result = await this.issueOtp(user, purpose);
+    const otp = await this.customerOtpConfiguration(user);
     const type: OtpChallengePayload["type"] =
       purpose === VerificationOtpPurpose.PASSWORD_RESET
         ? "customer_password_reset"
@@ -455,9 +439,28 @@ export class AuthService {
       verificationRequired: true,
       challengeToken: await this.signOtpChallenge(user.id, type),
       maskedDestination: this.maskMobile(user.mobile),
-      message: "Verification code sent securely",
-      ...result,
+      message: "MSG91 is ready to send the verification code securely",
+      expiresInMinutes: 5,
+      resendAfterSeconds: this.otpCooldownSeconds(),
+      otp,
     };
+  }
+
+  private async customerOtpConfiguration(user: User) {
+    if (!user.mobile) {
+      throw new ServiceUnavailableException("OTP delivery requires a registered mobile number");
+    }
+    if (!this.customerOtp) {
+      throw new ServiceUnavailableException("Customer OTP provider is unavailable");
+    }
+    return this.customerOtp.getClientConfiguration(user.mobile);
+  }
+
+  private async verifyCustomerOtpAccessToken(user: User, accessToken: string) {
+    if (!user.mobile || !this.customerOtp) {
+      throw new ServiceUnavailableException("Customer OTP provider is unavailable");
+    }
+    await this.customerOtp.verifyAccessToken(accessToken, user.mobile);
   }
 
   private async issueOtp(user: User, purpose: VerificationOtpPurpose) {

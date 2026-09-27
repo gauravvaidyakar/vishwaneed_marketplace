@@ -10,7 +10,9 @@ Interakt body variables are sent in the following order:
 Customer registration and password-reset OTPs are intentionally excluded from
 WhatsApp. Authentication OTP delivery uses the SMS provider boundary.
 The production SMS provider is MSG91 SendOTP, configured with
-`MSG91_AUTH_KEY` and `MSG91_OTP_TEMPLATE_ID` through the encrypted Admin System
+Customer authentication OTP is separate from WhatsApp and uses the default MSG91 OTP
+Widget configured with `MSG91_AUTH_KEY`, `MSG91_WIDGET_ID`, and
+`MSG91_WIDGET_TOKEN` through the encrypted Admin System
 configuration page (or backend-only environment fallback). MSG91 injects the
 server-generated code into the approved `##OTP##` template; the backend remains
 authoritative for OTP expiry, attempt limits, hashing, and verification.

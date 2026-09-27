@@ -2149,7 +2149,8 @@ function System() {
                 const settings = q.data.filter(
                   (setting) => setting.provider === provider,
                 );
-                const ready = settings.length > 0 && settings.every((setting) => setting.configured);
+                const requiredSettings = settings.filter((setting) => setting.required !== false);
+                const ready = requiredSettings.length > 0 && requiredSettings.every((setting) => setting.configured);
                 return (
                   <section className="card integration-card" key={provider}>
                     <div className="integration-heading">
@@ -2178,7 +2179,7 @@ function System() {
                           <small>
                             {setting.configured
                               ? `Stored via ${setting.source.toLowerCase()}`
-                              : "Required"}
+                              : setting.required === false ? "Optional" : "Required"}
                             {setting.updatedAt
                               ? ` · Updated ${new Date(setting.updatedAt).toLocaleString("en-IN")}`
                               : ""}
@@ -2228,6 +2229,7 @@ interface IntegrationSetting {
   provider: "RAZORPAY" | "SHIPROCKET" | "INTERAKT" | "MSG91";
   label: string;
   secret: boolean;
+  required?: boolean;
   configured: boolean;
   source: "DATABASE" | "ENVIRONMENT" | "NONE";
   maskedValue: string | null;

@@ -26,5 +26,11 @@ export class UpdateIntegrationSettingsDto {
   MSG91_AUTH_KEY?: string;
 
   @IsOptional() @IsString() @MinLength(6) @MaxLength(128)
+  MSG91_WIDGET_ID?: string;
+
+  @IsOptional() @IsString() @MinLength(6) @MaxLength(1024)
+  MSG91_WIDGET_TOKEN?: string;
+
+  @IsOptional() @IsString() @MinLength(6) @MaxLength(128)
   MSG91_OTP_TEMPLATE_ID?: string;
 }

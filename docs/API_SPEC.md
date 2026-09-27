@@ -376,7 +376,11 @@ DELETE /api/v1/admin/integration-settings/:key
 The GET response contains only configured/source state and masked hints. It never
 returns plaintext or encrypted credential values. PATCH accepts only the approved
 Razorpay, Shiprocket, Interakt and MSG91 keys. MSG91 requires
-`MSG91_AUTH_KEY` and `MSG91_OTP_TEMPLATE_ID`. Stored values are encrypted at rest and
+`MSG91_AUTH_KEY`, `MSG91_WIDGET_ID`, and `MSG91_WIDGET_TOKEN`. Customer registration,
+login verification, resend, and password-reset OTP use the default MSG91 OTP Widget;
+the server validates the widget's one-time access token before changing authentication
+state. `MSG91_OTP_TEMPLATE_ID` remains optional only for legacy server-generated SMS.
+Stored values are encrypted at rest and
 all changes are recorded in AuditLog without credential contents. Environment
 variables remain fallback values when no database override exists.
 

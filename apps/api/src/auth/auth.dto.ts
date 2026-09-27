@@ -85,7 +85,5 @@ export class CustomerOtpChallengeDto {
 }
 
 export class VerifyCustomerOtpDto extends CustomerOtpChallengeDto {
-  @IsString()
-  @Matches(/^\d{6}$/, { message: "OTP must contain exactly 6 digits" })
-  code!: string;
+  @IsString() @IsNotEmpty() accessToken!: string;
 }

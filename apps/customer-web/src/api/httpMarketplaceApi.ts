@@ -130,12 +130,12 @@ export class HttpMarketplaceApi implements MarketplaceApi {
     return this.client.post("/auth/customer/otp/resend", { challengeToken });
   }
 
-  verifyCustomerOtp(challengeToken: string, code: string): Promise<AuthSession> {
-    return this.client.post("/auth/customer/otp/verify", { challengeToken, code });
+  verifyCustomerOtp(challengeToken: string, accessToken: string): Promise<AuthSession> {
+    return this.client.post("/auth/customer/otp/verify", { challengeToken, accessToken });
   }
 
-  verifyPasswordResetOtp(challengeToken: string, code: string): Promise<PasswordResetOtpResult> {
-    return this.client.post("/auth/customer/password-reset/verify-otp", { challengeToken, code });
+  verifyPasswordResetOtp(challengeToken: string, accessToken: string): Promise<PasswordResetOtpResult> {
+    return this.client.post("/auth/customer/password-reset/verify-otp", { challengeToken, accessToken });
   }
 
   requestVerificationOtp(): Promise<VerificationOtpResult> {

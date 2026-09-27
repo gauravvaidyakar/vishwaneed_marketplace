@@ -144,21 +144,21 @@ export function createMockMarketplaceApi(): MarketplaceApi {
     },
     async register(input: RegisterInput) {
       await wait();
-      return { verificationRequired: true as const, challengeToken: 'mock-account-challenge', maskedDestination: `******${input.mobile.slice(-4)}`, message: 'Verification code sent securely', expiresInMinutes: 5, resendAfterSeconds: 30 };
+      return { verificationRequired: true as const, challengeToken: 'mock-account-challenge', maskedDestination: `******${input.mobile.slice(-4)}`, message: 'Verification code sent securely', expiresInMinutes: 5, resendAfterSeconds: 30, otp: { provider: 'MSG91_WIDGET' as const, widgetId: 'mock-widget', tokenAuth: 'mock-token', identifier: `91${input.mobile}` } };
     },
     async logout() {
       await wait();
     },
     async forgotPassword() {
       await wait();
-      return { message: 'If the account exists, a verification code will be sent securely.', challengeToken: 'mock-reset-challenge', maskedDestination: '******3210', resendAfterSeconds: 30 };
+      return { message: 'If the account exists, a verification code will be sent securely.', challengeToken: 'mock-reset-challenge', maskedDestination: '******3210', resendAfterSeconds: 30, otp: { provider: 'MSG91_WIDGET' as const, widgetId: 'mock-widget', tokenAuth: 'mock-token', identifier: '919876543210' } };
     },
     async resetPassword() {
       await wait();
     },
     async resendCustomerOtp(challengeToken: string) {
       await wait();
-      return { verificationRequired: true, challengeToken, maskedDestination: '******3210', message: 'A new verification code was sent securely', expiresInMinutes: 5, resendAfterSeconds: 30 };
+      return { verificationRequired: true, challengeToken, maskedDestination: '******3210', message: 'A new verification code was sent securely', expiresInMinutes: 5, resendAfterSeconds: 30, otp: { provider: 'MSG91_WIDGET' as const, widgetId: 'mock-widget', tokenAuth: 'mock-token', identifier: '919876543210' } };
     },
     async verifyCustomerOtp(_challengeToken: string, code: string): Promise<AuthSession> {
       await wait();

@@ -139,6 +139,13 @@ export interface AuthSession {
   customer: Customer;
 }
 
+export interface Msg91OtpConfiguration {
+  provider: 'MSG91_WIDGET';
+  widgetId: string;
+  tokenAuth: string;
+  identifier: string;
+}
+
 export interface CustomerOtpChallenge {
   verificationRequired: true;
   challengeToken: string;
@@ -146,6 +153,7 @@ export interface CustomerOtpChallenge {
   message: string;
   expiresInMinutes: number;
   resendAfterSeconds: number;
+  otp: Msg91OtpConfiguration;
   verified?: boolean;
 }
 
@@ -173,6 +181,7 @@ export interface PasswordResetRequestResult {
   challengeToken: string;
   maskedDestination: string;
   resendAfterSeconds: number;
+  otp?: Msg91OtpConfiguration;
   developmentResetUrl?: string;
 }
 
@@ -507,8 +516,8 @@ export interface MarketplaceApi {
   forgotPassword(emailOrMobile: string): Promise<PasswordResetRequestResult>;
   resetPassword(input: ResetPasswordInput): Promise<void>;
   resendCustomerOtp(challengeToken: string): Promise<CustomerOtpChallenge>;
-  verifyCustomerOtp(challengeToken: string, code: string): Promise<AuthSession>;
-  verifyPasswordResetOtp(challengeToken: string, code: string): Promise<PasswordResetOtpResult>;
+  verifyCustomerOtp(challengeToken: string, accessToken: string): Promise<AuthSession>;
+  verifyPasswordResetOtp(challengeToken: string, accessToken: string): Promise<PasswordResetOtpResult>;
   requestVerificationOtp(): Promise<VerificationOtpResult>;
   verifyOtp(code: string): Promise<VerificationOtpResult>;
   getCart(): Promise<Cart>;

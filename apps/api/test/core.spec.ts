@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 import { compare, hash } from "bcryptjs";
 import { AdminService } from "../src/admin/admin.service";
 import { AuthService } from "../src/auth/auth.service";
+import type { CustomerOtpProvider } from "../src/auth/customer-otp-provider";
 import { validateEnvironment } from "../src/config/environment";
 import type { PrismaService } from "../src/database/prisma.service";
 import type { VendorsService } from "../src/vendors/vendors.service";
@@ -266,9 +267,6 @@ describe("platform security rules", () => {
   });
 
   it("creates the existing customer session only after the public OTP challenge is verified", async () => {
-    const consumed = vi.fn()
-      .mockResolvedValueOnce({ count: 1 })
-      .mockResolvedValueOnce({ count: 0 });
     const user = {
       id: "customer-user",
       email: "customer@example.com",
@@ -279,14 +277,11 @@ describe("platform security rules", () => {
       role: Role.CUSTOMER,
       status: UserStatus.ACTIVE,
     };
-    const transactionClient = {
-      verificationOtp: { updateMany: consumed },
-      user: { update: vi.fn().mockResolvedValue(user) },
-    };
+    const updateUser = vi.fn().mockResolvedValue(user);
     const prisma = {
       user: {
         findUnique: vi.fn().mockResolvedValue(user),
-        update: vi.fn().mockResolvedValue(user),
+        update: updateUser,
       },
       customerProfile: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
@@ -303,10 +298,6 @@ describe("platform security rules", () => {
           attempts: 0,
         }),
       },
-      $transaction: vi.fn(
-        (operation: (tx: typeof transactionClient) => Promise<unknown>) =>
-          operation(transactionClient),
-      ),
     } as unknown as PrismaService;
     const jwt = {
       verifyAsync: vi.fn().mockResolvedValue({
@@ -321,7 +312,16 @@ describe("platform security rules", () => {
       get: vi.fn((_key: string, fallback?: unknown) => fallback),
       getOrThrow: vi.fn().mockReturnValue("a-secure-test-secret-that-is-long-enough"),
     } as unknown as ConfigService;
-    const service = new AuthService(prisma, jwt, config);
+    const verifyAccessToken = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new BadRequestException("Verification code is invalid or expired"));
+    const service = new AuthService(
+      prisma,
+      jwt,
+      config,
+      undefined,
+      { verifyAccessToken } as unknown as CustomerOtpProvider,
+    );
 
     await expect(service.verifyCustomerAccountOtp("challenge", "123456"))
       .resolves.toMatchObject({
@@ -331,6 +331,7 @@ describe("platform security rules", () => {
       });
     await expect(service.verifyCustomerAccountOtp("challenge", "123456"))
       .rejects.toThrow("invalid or expired");
+    expect(verifyAccessToken).toHaveBeenCalledWith("123456", "9876543210");
   });
 
   it("counts an invalid one-time-code attempt without exposing the expected code", async () => {
@@ -452,8 +453,8 @@ describe("platform security rules", () => {
     });
   });
 
-  it("uses SMS rather than WhatsApp for a customer password-reset OTP", async () => {
-    const sendSms = vi.fn().mockResolvedValue({ status: NotificationStatus.SENT });
+  it("uses the MSG91 widget rather than WhatsApp for a customer password-reset OTP", async () => {
+    const sendSms = vi.fn();
     const sendWhatsApp = vi.fn();
     const prisma = {
       user: {
@@ -465,12 +466,6 @@ describe("platform security rules", () => {
           status: UserStatus.ACTIVE,
         }),
       },
-      verificationOtp: {
-        findFirst: vi.fn().mockResolvedValue(null),
-        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-        create: vi.fn().mockResolvedValue({}),
-      },
-      $transaction: vi.fn((operations: Promise<unknown>[]) => Promise.all(operations)),
     } as unknown as PrismaService;
     const jwt = {
       signAsync: vi.fn().mockResolvedValue("password-reset-challenge"),
@@ -480,21 +475,27 @@ describe("platform security rules", () => {
       getOrThrow: vi.fn().mockReturnValue("a-secure-test-secret-that-is-long-enough"),
     } as unknown as ConfigService;
     const notifications = { sendSms, sendWhatsApp } as unknown as NotificationsService;
-    const service = new AuthService(prisma, jwt, config, notifications);
+    const getClientConfiguration = vi.fn().mockResolvedValue({
+      provider: "MSG91_WIDGET",
+      widgetId: "widget-id",
+      tokenAuth: "browser-token",
+      identifier: "919876543210",
+    });
+    const service = new AuthService(
+      prisma,
+      jwt,
+      config,
+      notifications,
+      { getClientConfiguration } as unknown as CustomerOtpProvider,
+    );
 
     await expect(service.forgotPassword({ emailOrMobile: "customer@example.com" }))
-      .resolves.toMatchObject({ challengeToken: "password-reset-challenge" });
-    const resetDelivery = sendSms.mock.calls[0]?.[3] as
-      | { otp: string; expiresInMinutes: number }
-      | undefined;
-    expect(sendSms).toHaveBeenCalledWith(
-      "customer-user",
-      "password_reset_otp",
-      { expiresInMinutes: 5 },
-      resetDelivery,
-    );
-    expect(resetDelivery).toMatchObject({ expiresInMinutes: 5 });
-    expect(resetDelivery?.otp).toMatch(/^\d{6}$/);
+      .resolves.toMatchObject({
+        challengeToken: "password-reset-challenge",
+        otp: { provider: "MSG91_WIDGET", identifier: "919876543210" },
+      });
+    expect(getClientConfiguration).toHaveBeenCalledWith("9876543210");
+    expect(sendSms).not.toHaveBeenCalled();
     expect(sendWhatsApp).not.toHaveBeenCalled();
   });
 

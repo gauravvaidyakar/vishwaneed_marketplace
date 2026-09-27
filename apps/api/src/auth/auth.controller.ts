@@ -70,13 +70,13 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   verifyCustomerOtp(@Body() input: VerifyCustomerOtpDto) {
-    return this.auth.verifyCustomerAccountOtp(input.challengeToken, input.code);
+    return this.auth.verifyCustomerAccountOtp(input.challengeToken, input.accessToken);
   }
   @Post("customer/password-reset/verify-otp")
   @HttpCode(HttpStatus.OK)
   @Throttle({ default: { ttl: 60_000, limit: 5 } })
   verifyCustomerPasswordResetOtp(@Body() input: VerifyCustomerOtpDto) {
-    return this.auth.verifyPasswordResetOtp(input.challengeToken, input.code);
+    return this.auth.verifyPasswordResetOtp(input.challengeToken, input.accessToken);
   }
   @Post("request-verification-otp")
   @HttpCode(HttpStatus.OK)
