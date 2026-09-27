@@ -41,7 +41,7 @@ function ProductImage({ src, alt, className = '' }: { src?: string; alt: string;
     );
   }
 
-  return <img className={className} src={src} alt={alt} onError={() => setFailed(true)} />;
+  return <img className={className} src={src} alt={alt} width="900" height="900" decoding="async" onError={() => setFailed(true)} />;
 }
 
 function ProductDetailsSkeleton() {

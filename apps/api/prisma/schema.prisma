@@ -482,6 +482,7 @@ model Product {
 
   @@index([vendorId, status])
   @@index([categoryId, productType, status])
+  @@index([status, createdAt])
   @@index([name])
 }
 

@@ -32,7 +32,7 @@ export function ProductCard({ product }: { product: Product }) {
   return (
     <article className="product-card">
       <Link className="product-card-image" to={`/products/${product.id}`}>
-        {product.images[0] ? <img src={product.images[0]} alt={product.name} loading="lazy" /> : <span className="product-image-empty" aria-label="No product image available">No image</span>}
+        {product.images[0] ? <img src={product.images[0]} alt={product.name} width="640" height="480" loading="lazy" decoding="async" /> : <span className="product-image-empty" aria-label="No product image available">No image</span>}
         {discount !== null && <span className="discount-badge">{discount}% off</span>}
         {outOfStock && <span className="stock-overlay">Out of stock</span>}
       </Link>

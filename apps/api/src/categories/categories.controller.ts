@@ -27,16 +27,16 @@ import { CreateCategoryDto, UpdateCategoryDto } from "./categories.dto";
 export class CategoriesController {
   constructor(private readonly categories: CategoriesService) {}
   @Get("categories")
-  @Header("Cache-Control", "public, max-age=5, stale-while-revalidate=30")
-  @Header("CDN-Cache-Control", "public, s-maxage=5, stale-while-revalidate=30")
-  @Header("Vercel-CDN-Cache-Control", "public, s-maxage=5, stale-while-revalidate=30")
+  @Header("Cache-Control", "public, max-age=300, stale-while-revalidate=3600")
+  @Header("CDN-Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400")
+  @Header("Vercel-CDN-Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400")
   list() {
     return this.categories.list();
   }
   @Get("categories/:id")
-  @Header("Cache-Control", "public, max-age=5, stale-while-revalidate=30")
-  @Header("CDN-Cache-Control", "public, s-maxage=5, stale-while-revalidate=30")
-  @Header("Vercel-CDN-Cache-Control", "public, s-maxage=5, stale-while-revalidate=30")
+  @Header("Cache-Control", "public, max-age=300, stale-while-revalidate=3600")
+  @Header("CDN-Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400")
+  @Header("Vercel-CDN-Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400")
   get(@Param("id") id: string) {
     return this.categories.get(id);
   }

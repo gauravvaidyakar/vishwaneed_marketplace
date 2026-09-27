@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, ProductStatus, VendorStatus } from "@prisma/client";
+import { Prisma, ProductStatus, ReviewStatus, VendorStatus } from "@prisma/client";
 import { randomBytes } from "node:crypto";
 import { PrismaService } from "../database/prisma.service";
 import { VendorsService } from "../vendors/vendors.service";
@@ -13,6 +13,48 @@ import type {
   ProductQueryDto,
   UpdateProductDto,
 } from "./products.dto";
+
+const publicProductSelect = {
+  id: true,
+  vendorId: true,
+  categoryId: true,
+  name: true,
+  slug: true,
+  description: true,
+  productType: true,
+  price: true,
+  mrp: true,
+  weightGrams: true,
+  lengthCm: true,
+  widthCm: true,
+  heightCm: true,
+  ingredients: true,
+  specifications: true,
+  category: { select: { name: true } },
+  vendor: {
+    select: {
+      id: true,
+      businessName: true,
+      pickupPincode: true,
+      _count: {
+        select: {
+          products: { where: { status: ProductStatus.APPROVED } },
+        },
+      },
+    },
+  },
+  images: {
+    orderBy: { sortOrder: "asc" as const },
+    select: { url: true },
+  },
+  inventory: {
+    select: { quantity: true, reserved: true, lowStockThreshold: true },
+  },
+} satisfies Prisma.ProductSelect;
+
+type PublicProduct = Prisma.ProductGetPayload<{
+  select: typeof publicProductSelect;
+}>;
 
 @Injectable()
 export class ProductsService {
@@ -60,15 +102,22 @@ export class ProductsService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.product.findMany({
         where,
-        include: this.publicInclude(),
+        select: publicProductSelect,
         orderBy,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
       }),
       this.prisma.product.count({ where }),
     ]);
+    const ratings = await this.ratingMaps(items);
     return {
-      data: items.map((item) => this.toPublic(item)),
+      data: items.map((item) =>
+        this.toPublic(
+          item,
+          ratings.products.get(item.id),
+          ratings.vendors.get(item.vendorId),
+        ),
+      ),
       meta: {
         page: query.page,
         limit: query.limit,
@@ -85,10 +134,15 @@ export class ProductsService {
         status: ProductStatus.APPROVED,
         vendor: { status: VendorStatus.APPROVED },
       },
-      include: this.publicInclude(),
+      select: publicProductSelect,
     });
     if (!product) throw new NotFoundException("Product not found");
-    return this.toPublic(product);
+    const ratings = await this.ratingMaps([product]);
+    return this.toPublic(
+      product,
+      ratings.products.get(product.id),
+      ratings.vendors.get(product.vendorId),
+    );
   }
 
   async vendorList(userId: string, query: ProductQueryDto) {
@@ -242,53 +296,15 @@ export class ProductsService {
     });
   }
 
-  private publicInclude() {
-    return {
-      category: true,
-      vendor: {
-        include: {
-          _count: {
-            select: {
-              products: { where: { status: ProductStatus.APPROVED } },
-            },
-          },
-          products: {
-            where: { status: ProductStatus.APPROVED },
-            select: {
-              reviews: {
-                where: { status: "PUBLISHED" as const },
-                select: { rating: true },
-              },
-            },
-          },
-        },
-      },
-      images: { orderBy: { sortOrder: "asc" as const } },
-      inventory: true,
-      reviews: {
-        where: { status: "PUBLISHED" as const },
-        select: { rating: true },
-      },
-    };
-  }
   private toPublic(
-    product: Awaited<ReturnType<ProductsService["fetchPublicShape"]>>,
+    product: PublicProduct,
+    productRating = { rating: 0, reviewCount: 0 },
+    vendorRating = 0,
   ) {
     const available = Math.max(
       0,
       (product.inventory?.quantity ?? 0) - (product.inventory?.reserved ?? 0),
     );
-    const ratings = product.reviews.map((review) => review.rating);
-    const rating = ratings.length
-      ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length
-      : 0;
-    const vendorRatings = product.vendor.products.flatMap((vendorProduct) =>
-      vendorProduct.reviews.map((review) => review.rating),
-    );
-    const vendorRating = vendorRatings.length
-      ? vendorRatings.reduce((sum, value) => sum + value, 0) /
-        vendorRatings.length
-      : 0;
     return {
       id: product.id,
       slug: product.slug,
@@ -331,15 +347,73 @@ export class ProductsService {
             ? "LOW_STOCK"
             : "IN_STOCK",
       availableQuantity: available,
-      rating,
-      reviewCount: ratings.length,
+      rating: productRating.rating,
+      reviewCount: productRating.reviewCount,
       featured: false,
       bestSeller: false,
     };
   }
-  private fetchPublicShape() {
-    return this.prisma.product.findFirstOrThrow({
-      include: this.publicInclude(),
+
+  private async ratingMaps(products: PublicProduct[]) {
+    const productIds = products.map((product) => product.id);
+    const vendorIds = [...new Set(products.map((product) => product.vendorId))];
+    if (!productIds.length) {
+      return {
+        products: new Map<string, { rating: number; reviewCount: number }>(),
+        vendors: new Map<string, number>(),
+      };
+    }
+
+    const [productRatings, vendorReviews] = await Promise.all([
+      this.prisma.review.groupBy({
+        by: ["productId"],
+        where: {
+          productId: { in: productIds },
+          status: ReviewStatus.PUBLISHED,
+        },
+        _avg: { rating: true },
+        _count: { rating: true },
+      }),
+      this.prisma.review.findMany({
+        where: {
+          status: ReviewStatus.PUBLISHED,
+          product: {
+            vendorId: { in: vendorIds },
+            status: ProductStatus.APPROVED,
+          },
+        },
+        select: {
+          rating: true,
+          product: { select: { vendorId: true } },
+        },
+      }),
+    ]);
+
+    const productMap = new Map(
+      productRatings.map((entry) => [
+        entry.productId,
+        {
+          rating: entry._avg.rating ?? 0,
+          reviewCount: entry._count.rating,
+        },
+      ]),
+    );
+    const vendorTotals = new Map<string, { total: number; count: number }>();
+    vendorReviews.forEach((review) => {
+      const current = vendorTotals.get(review.product.vendorId) ?? {
+        total: 0,
+        count: 0,
+      };
+      current.total += review.rating;
+      current.count += 1;
+      vendorTotals.set(review.product.vendorId, current);
     });
+    const vendorMap = new Map(
+      [...vendorTotals].map(([vendorId, summary]) => [
+        vendorId,
+        summary.count ? summary.total / summary.count : 0,
+      ]),
+    );
+    return { products: productMap, vendors: vendorMap };
   }
 }

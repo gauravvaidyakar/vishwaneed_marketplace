@@ -1,7 +1,7 @@
 import { ArrowRight, BadgeCheck, Image as ImageIcon, MapPin, PackageCheck, Star, Truck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useMemo } from 'react';
-import heroVegetables from '../assets/vishwaneed_hero_vegetables_image.png';
+import heroVegetables from '../assets/vishwaneed_hero_vegetables_image.webp';
 import { HomeHeroCarousel, type HomeHeroSlide } from '../components/home/HomeHeroCarousel';
 import { ScrollReveal } from '../components/home/ScrollReveal';
 import { ProductGrid } from '../components/product/ProductGrid';

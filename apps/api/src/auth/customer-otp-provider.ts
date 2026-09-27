@@ -81,7 +81,8 @@ export class CustomerOtpProvider {
   }
 
   private isFailure(payload: Record<string, unknown>): boolean {
-    const type = String(payload.type ?? payload.status ?? "").toLowerCase();
+    const candidate = payload.type ?? payload.status;
+    const type = typeof candidate === "string" ? candidate.toLowerCase() : "";
     return ["error", "failed", "failure", "unauthorized", "invalid"].includes(type) || payload.success === false;
   }
 

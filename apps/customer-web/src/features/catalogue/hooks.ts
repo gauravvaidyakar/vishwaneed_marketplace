@@ -23,8 +23,7 @@ export function useCategories() {
   return useQuery({
     queryKey: catalogueKeys.categories,
     queryFn: () => marketplaceApi.getCategories(),
-    staleTime: 5 * 1000,
-    refetchOnWindowFocus: true,
+    staleTime: 10 * 60 * 1000,
   });
 }
 
